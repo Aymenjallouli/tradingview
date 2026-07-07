@@ -297,9 +297,9 @@
         </tr></thead><tbody id="grid-active"></tbody></table>
       </div>
       <div style="flex:1">
-        <div class="scan-sub">Most-ranging coins (choppiness = grid-friendly)</div>
+        <div class="scan-sub">Grid detail</div>
         <table class="scan-table"><thead><tr>
-          <th>Coin</th><th>Choppiness</th><th>Width</th>
+          <th>Coin</th><th>Spread/side</th><th>Positions</th>
         </tr></thead><tbody id="grid-ranked"></tbody></table>
       </div>
     </div>
@@ -513,9 +513,14 @@ function renderGrid(g){
         <td class="${a.realized>=0?'pos':'neg'}">$${a.realized.toFixed(3)}</td>
         <td>$${a.value.toFixed(2)}</td></tr>`).join("")
     : `<tr><td colspan="5" class="empty">scanning for ranging coins…</td></tr>`;
-  $("grid-ranked").innerHTML = (g.ranked||[]).slice(0,8).map(r=>`<tr>
-    <td>${r.symbol}</td><td>${r.chop}</td><td>${r.width_pct}%</td></tr>`).join("")
-    || `<tr><td colspan="3" class="empty">—</td></tr>`;
+  // Second column: per-grid detail (spread + holdings) instead of the old
+  // chop/width fields the v2 snapshot no longer carries.
+  $("grid-ranked").innerHTML = (g.active_grids||[]).length
+    ? g.active_grids.map(a=>`<tr>
+        <td>${a.symbol}</td>
+        <td>${a.spread!=null?a.spread+"%":"—"}</td>
+        <td>${a.holdings||0} held</td></tr>`).join("")
+    : `<tr><td colspan="3" class="empty">—</td></tr>`;
 }
 
 function renderHero(s){
