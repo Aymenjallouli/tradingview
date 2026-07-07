@@ -77,48 +77,43 @@ def index():
 
 
 def _enrich(snap):
-    """Add Claude + scanner data to an engine snapshot (used by both endpoints)."""
-    snap["claude"] = HELPER.snapshot()
+    """Add Claude + radar + arb + grid data to an engine snapshot.
+
+    Each add-on is guarded so a failure in one never 500s the whole endpoint —
+    the dashboard degrades gracefully instead of going blank.
+    """
+    try:
+        snap["claude"] = HELPER.snapshot()
+    except Exception as exc:  # noqa: BLE001
+        snap["claude"] = {"text": f"(helper error: {exc})", "at": None}
     if SCANNER:
-        # Scanner's own paper account, presented like a strategy card.
-        b = ENGINE.broker
-        prices = snap.get("prices", {})
-        # Value scanner positions at last scanned price (fallback to entry).
-        positions = []
-        equity = b.cash("scanner")
-        for p in b.open_positions("scanner"):
-            mark = SCANNER._last_prices.get(p["symbol"], p["fill_price"])
-            positions.append({
-                "symbol": p["symbol"], "entry": round(p["entry_price"], 6),
-                "price": round(mark, 6),
-                "unrealized": round((mark - p["fill_price"]) * p["qty"], 4)})
-            equity += p["qty"] * mark
-        snap["scanner"] = {
-            "account": {
-                "key": "scanner", "label": "Scanner (many markets)",
-                "market": "crypto", "timeframe": SCANNER.timeframe,
-                "cash": round(b.cash("scanner"), 2),
-                "equity": round(equity, 2),
-                "start_capital": config.STARTING_CAPITAL,
-                "positions": positions, "stats": b.stats("scanner"),
-                "recent_trades": [{
-                    "symbol": t["symbol"], "pnl": round(t["pnl"], 4),
-                    "return_pct": round(t["return_pct"] * 100, 2),
-                    "reason": t["exit_reason"], "exit_time": t["exit_time"],
-                } for t in b.trades("scanner")[-15:][::-1]],
-            },
-            **SCANNER.snapshot(),
-        }
+        # Radar is support-only (no account/trading) — just its watchlists.
+        try:
+            snap["scanner"] = SCANNER.snapshot()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[state] scanner snapshot error: {exc}", flush=True)
     if ARB:
-        snap["arb"] = ARB.snapshot()
+        try:
+            snap["arb"] = ARB.snapshot()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[state] arb snapshot error: {exc}", flush=True)
     if GRID:
-        snap["grid"] = GRID.snapshot()
+        try:
+            snap["grid"] = GRID.snapshot()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[state] grid snapshot error: {exc}", flush=True)
     return snap
 
 
 @app.get("/api/state")
 def state():
-    return JSONResponse(_enrich(ENGINE.snapshot()))
+    try:
+        return JSONResponse(_enrich(ENGINE.snapshot()))
+    except Exception as exc:  # noqa: BLE001 - never 500 the dashboard
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(exc), "strategies": [],
+                             "prices": {}, "connected": {}}, status_code=200)
 
 
 @app.get("/api/stream")
@@ -132,15 +127,16 @@ async def stream():
         ticks = 0
         while True:
             snap = _enrich(ENGINE.snapshot())
-            # Fingerprint on prices, per-strategy equity + trade counts.
+            # Fingerprint on prices, per-strategy equity + trade counts, and
+            # grid/radar state, so a meaningful change pushes an update.
             fp = json.dumps({
                 "px": snap["prices"], "conn": snap["connected"],
                 "s": [(s["key"], s["equity"], s["stats"]["trades"],
                        len(s["positions"])) for s in snap["strategies"]],
-                "claude_at": snap["claude"].get("at"),
-                "scan": (snap.get("scanner", {}).get("last_scan")),
-                "scan_eq": (snap.get("scanner", {}).get("account", {})
-                            .get("equity")),
+                "claude_at": snap.get("claude", {}).get("at"),
+                "scan": snap.get("scanner", {}).get("last_scan"),
+                "grid_eq": snap.get("grid", {}).get("equity"),
+                "grid_tr": snap.get("grid", {}).get("total_trades"),
             }, sort_keys=True)
             if fp != last or ticks % 5 == 0:
                 last = fp
