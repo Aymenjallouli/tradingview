@@ -162,6 +162,9 @@ class SmartGrid:
             return
         scored = []
         for sym in universe:
+            # Skip non-ASCII / junk ticker names (scam tokens like 币安人生USDT).
+            if not sym.isascii() or not sym.replace("USDT", "").isalnum():
+                continue
             c = _klines(sym, "1h", 300)
             if not c or len(c) < 100:
                 continue
@@ -250,12 +253,21 @@ class SmartGrid:
         equity = total_value + max(idle, 0)
         total_trades = sum(g.trades for g in self.grids.values())
         total_realized = sum(g.realized for g in self.grids.values())
+        def fmt(v):
+            # Adaptive decimals so micro-price coins (BONK/SHIB) aren't "0.0000".
+            if v == 0:
+                return "0"
+            if v >= 1:
+                return f"{v:.4f}"
+            if v >= 0.001:
+                return f"{v:.6f}"
+            return f"{v:.9f}"
         active = [{
             "symbol": s, "trades": g.trades,
             "realized": round(g.realized, 4),
             "value": round(g.value(self._last_prices.get(s, g.prev_price or g.low)), 2),
             "holdings": len(g.holdings),
-            "range": f"{g.low:.4f}-{g.high:.4f}",
+            "range": f"{fmt(g.low)}-{fmt(g.high)}",
         } for s, g in self.grids.items()]
         return {
             "last_scan": self.last_scan,
