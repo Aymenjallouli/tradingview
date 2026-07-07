@@ -112,12 +112,45 @@ class ClaudeTrader:
     # Build the context + prompt for one decision.
     # ------------------------------------------------------------------
     def _universe(self):
+        """Give Claude a BROAD, real universe of liquid coins to choose from —
+        not just BTC/ETH. Pulls the top liquid USDT pairs by 24h volume directly
+        from Binance (cached ~10 min), plus the radar's candidates, plus BTC/ETH.
+        """
         syms = list(UNIVERSE_EXTRA)
+        # Cache the liquid list so we don't hammer the API every decision.
+        now = time.time()
+        if now - getattr(self, "_uni_ts", 0) > 600:
+            try:
+                info = requests.get(f"{config.BINANCE_REST}/api/v3/exchangeInfo",
+                                    timeout=20).json()
+                spot = {s["symbol"] for s in info["symbols"]
+                        if s["symbol"].endswith("USDT")
+                        and s["status"] == "TRADING"
+                        and s.get("isSpotTradingAllowed")}
+                skip = {"USDCUSDT", "FDUSDUSDT", "USD1USDT", "TUSDUSDT",
+                        "DAIUSDT", "USDPUSDT", "EURUSDT", "AEURUSDT",
+                        "BUSDUSDT", "RLUSDUSDT"}
+                tk = requests.get(f"{config.BINANCE_REST}/api/v3/ticker/24hr",
+                                  timeout=25).json()
+                rows = [(t["symbol"], float(t["quoteVolume"])) for t in tk
+                        if t["symbol"] in spot and t["symbol"] not in skip
+                        and t["symbol"].isascii()
+                        and t["symbol"].replace("USDT", "").isalnum()
+                        and float(t["quoteVolume"]) >= 10_000_000]
+                rows.sort(key=lambda x: x[1], reverse=True)
+                self._liquid_cache = [s for s, _ in rows[:30]]
+                self._uni_ts = now
+            except Exception:  # noqa: BLE001
+                self._liquid_cache = getattr(self, "_liquid_cache", [])
+        # Merge: BTC/ETH + radar picks + broad liquid list.
         if self.radar is not None:
             for c in (self.radar.grid_candidates + self.radar.trend_candidates):
                 if c["symbol"] not in syms:
                     syms.append(c["symbol"])
-        return syms[:12]
+        for s in getattr(self, "_liquid_cache", []):
+            if s not in syms:
+                syms.append(s)
+        return syms[:25]     # give Claude up to 25 real coins to pick from
 
     def _context(self):
         prices = {}
