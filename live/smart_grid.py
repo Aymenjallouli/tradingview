@@ -261,10 +261,21 @@ class SmartGrid:
             spread = self._spread_side(sym) or 0.0005
             round_trip = 2 * (FEE + spread)
             lo, hi = last * 0.92, last * 1.08
-            # Step >= 3x round-trip cost so bounces can clear costs.
-            min_step = 3 * round_trip
             band = (hi - lo) / last
-            n_levels = max(8, min(40, int(band / max(min_step, 0.008))))
+
+            # ADAPTIVE STEP: size the grid step to each coin's recent volatility
+            # so CALM coins get tighter grids that actually trade (not just the
+            # 1-2 choppiest coins). Step = ~4x the coin's typical 1m move.
+            # Hard floor of 3x round-trip cost so bounces still clear fees.
+            m1 = _klines(sym, "1m", 60)
+            if m1:
+                per_min = sum((h - l) / cc for h, l, cc in m1 if cc > 0) / len(m1)
+                vol_step = per_min * 4
+            else:
+                vol_step = 0.008
+            min_step = max(3 * round_trip, 0.004)      # never below cost hurdle
+            step = max(min_step, min(0.015, vol_step))  # clamp 0.4%–1.5%
+            n_levels = max(8, min(60, int(band / step)))
             self.grids[sym] = GridInstance(sym, lo, hi, n_levels,
                                            self.per_grid, spread_side=spread)
             _log(f"opening grid {sym} range {lo:.6f}-{hi:.6f} "
