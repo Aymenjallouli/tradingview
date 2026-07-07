@@ -160,7 +160,12 @@ class SmartGrid:
         self.per_grid = per_grid
         self.rescan_seconds = rescan_seconds
         self.price_seconds = price_seconds
-        self.radar = radar          # optional Scanner for ranging watchlist
+        self.radar = radar          # optional Scanner for the watchlists
+        # Which radar list(s) to grid: "ranging" (default), "trending", or
+        # "both". Grids work best on ranging coins, but gridding a trending
+        # coin still catches its pullbacks (range-break caps the downside).
+        self.source = "ranging"
+        self.account = "grid"       # broker account key (for a 2nd grid engine)
         self.grids = {}             # symbol -> GridInstance
         self.ranked = []            # latest choppiness ranking for the UI
         self.start_capital = grids * per_grid
@@ -200,12 +205,24 @@ class SmartGrid:
         """v2: only grid coins the RADAR flags as truly ranging + liquid +
         tight spread. Uses real spread as slippage; range-break liquidation is
         built into each grid. Falls back to its own liquid scan if no radar."""
-        # Preferred source: the radar's ranging watchlist (liquid, tight spread).
+        # Pull candidates from the radar per this engine's source setting.
         candidates = []
         if self.radar is not None:
-            for c in self.radar.grid_candidates:
-                if c.get("grid_eligible"):
-                    candidates.append(c["symbol"])
+            lists = []
+            # "both" prioritizes TRENDING coins first (so Grid B is a distinct
+            # experiment from Grid A's ranging-only), then fills with ranging.
+            if self.source == "trending":
+                lists = self.radar.trend_candidates
+            elif self.source == "both":
+                lists = self.radar.trend_candidates + self.radar.grid_candidates
+            else:  # ranging
+                lists = self.radar.grid_candidates
+            for c in lists:
+                # Only grid coins with a tradeable spread (<=0.075%/side).
+                sp = c.get("spread_pct")
+                if c.get("grid_eligible") or (sp is not None and sp <= 0.075):
+                    if c["symbol"] not in candidates:
+                        candidates.append(c["symbol"])
         # Fallback: scan liquid coins ourselves for choppiness.
         if not candidates:
             for sym in self._liquid():

@@ -53,6 +53,17 @@ GRID = SmartGrid(ENGINE.broker, scan_top=config.GRID_SCAN_TOP,
                  radar=SCANNER, rescan_seconds=config.GRID_RESCAN) \
     if config.GRID_ENABLED else None
 
+# Second grid engine: grids the radar's TRENDING candidates too (own $50 paper
+# account). More positions/action, same proven grid mechanics; lets you compare
+# gridding ranging vs trending coins side by side.
+GRID2 = None
+if config.GRID_ENABLED and config.GRID2_ENABLED:
+    GRID2 = SmartGrid(ENGINE.broker, grids=config.GRID_COUNT,
+                      per_grid=config.GRID_PER, radar=SCANNER,
+                      rescan_seconds=config.GRID_RESCAN)
+    GRID2.source = "both"       # ranging + trending
+    GRID2.account = "grid2"
+
 
 @app.on_event("startup")
 def _start_engine():
@@ -66,6 +77,8 @@ def _start_engine():
         threading.Thread(target=ARB.run, daemon=True).start()
     if GRID:
         threading.Thread(target=GRID.run, daemon=True).start()
+    if GRID2:
+        threading.Thread(target=GRID2.run, daemon=True).start()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -102,6 +115,11 @@ def _enrich(snap):
             snap["grid"] = GRID.snapshot()
         except Exception as exc:  # noqa: BLE001
             print(f"[state] grid snapshot error: {exc}", flush=True)
+    if GRID2:
+        try:
+            snap["grid2"] = GRID2.snapshot()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[state] grid2 snapshot error: {exc}", flush=True)
     return snap
 
 

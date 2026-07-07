@@ -129,5 +129,7 @@ GRID_PER = float(os.getenv("GRID_PER", "6"))
 # the selection fresh without churning; the range-break exit handles bad coins
 # in between rescans anyway.
 GRID_RESCAN = int(os.getenv("GRID_RESCAN", "1800"))   # 30 min re-selection
+# Second grid engine: grids ranging + trending candidates (own paper account).
+GRID2_ENABLED = os.getenv("GRID2_ENABLED", "1") not in ("0", "false", "False")
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8000"))

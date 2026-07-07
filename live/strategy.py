@@ -172,7 +172,10 @@ class ForexStrategy:
         return None
 
 
-ALL = {"trend": TrendStrategy, "scalp": ScalpStrategy, "forex": ForexStrategy}
+# Strategy registry. SCALP IS DELETED — it lost even at 0% fees (no real edge),
+# proven live and in backtest. The class stays in the file for reference but is
+# NOT registered, so it can never run again even if a stale env says "scalp".
+ALL = {"trend": TrendStrategy, "forex": ForexStrategy}
 
 
 def build(keys):

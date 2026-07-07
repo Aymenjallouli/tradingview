@@ -308,6 +308,21 @@
       trends. Paper money.</div>
   </div>
 
+  <!-- Second grid: ranging + trending candidates, own account -->
+  <h3>🧪 Grid B — ranging + trending coins (experiment)</h3>
+  <div class="card" id="grid2-card">
+    <div class="grid-badge" style="background:var(--accent-soft);border-color:var(--accent);color:var(--accent)">
+      Own $48 · grids BOTH ranging and trending picks · compare vs Grid A</div>
+    <div class="grid-head" id="grid2-head">Grid B warming up…</div>
+    <div class="scan-cols">
+      <div style="flex:1"><div class="scan-sub">Active grids</div>
+        <table class="scan-table"><thead><tr>
+          <th>Coin</th><th>Trades</th><th>Realized</th><th>Positions</th>
+        </tr></thead><tbody id="grid2-active"></tbody></table>
+      </div>
+    </div>
+  </div>
+
   <!-- Radar section (support role, no trading) -->
   <h3>📡 Market Radar — support (classifies markets, no trading)</h3>
   <div class="card" id="scanner-card">
@@ -523,11 +538,29 @@ function renderGrid(g){
     : `<tr><td colspan="3" class="empty">—</td></tr>`;
 }
 
+function renderGrid2(g){
+  if(!g){ return; }
+  const d = g.equity - g.start_capital;
+  $("grid2-head").innerHTML = !g.last_scan
+    ? `⏳ First scan…`
+    : `Equity <b class="${d>=0?'pos':'neg'}">$${g.equity.toFixed(2)}</b>
+       (${d>=0?'+':''}$${d.toFixed(2)}) · ${g.total_trades} trades ·
+       realized <b class="${g.realized_pnl>=0?'pos':'neg'}">$${g.realized_pnl.toFixed(2)}</b> ·
+       ${(g.active_grids||[]).length} grids`;
+  $("grid2-active").innerHTML = (g.active_grids||[]).length
+    ? g.active_grids.map(a=>`<tr>
+        <td>${a.symbol}</td><td>${a.trades}</td>
+        <td class="${a.realized>=0?'pos':'neg'}">$${a.realized.toFixed(3)}</td>
+        <td>${a.holdings||0} held</td></tr>`).join("")
+    : `<tr><td colspan="4" class="empty">scanning…</td></tr>`;
+}
+
 function renderHero(s){
-  // Total across every paper account: strategies + grid + scanner.
+  // Total across every paper account: strategies + both grids.
   let total = 0, start = 0, n = 0;
   (s.strategies||[]).forEach(x=>{ total += x.equity; start += x.start_capital; n++; });
   if(s.grid){ total += s.grid.equity; start += s.grid.start_capital; n++; }
+  if(s.grid2){ total += s.grid2.equity; start += s.grid2.start_capital; n++; }
   // Radar (scanner) no longer trades — not counted in portfolio value.
   const d = total - start;
   const pct = start? (total/start-1)*100 : 0;
@@ -546,6 +579,7 @@ function applySnapshot(s){
   safe(()=>renderTicker(s.prices||{}, s.connected), "ticker");
   safe(()=>renderCards(s.strategies||[]), "cards");
   safe(()=>renderGrid(s.grid), "grid");
+  safe(()=>renderGrid2(s.grid2), "grid2");
   safe(()=>renderScanner(s.scanner), "scanner");
   safe(()=>renderArb(s.arb), "arb");
   safe(()=>{
