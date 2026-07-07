@@ -29,7 +29,10 @@ POSITION_SIZE_PCT = 0.95        # trend/forex sizing
 SCALP_POSITION_PCT = 0.30       # scalp sizing (smaller, more frequent)
 
 # Which strategies to run (comma-separated: trend,scalp,forex).
-ENABLED = os.getenv("ENABLED", "trend,scalp,forex").split(",")
+# SCALP REMOVED: proven a guaranteed loser — 0% win rate even at 0% fees, so
+# the strategy itself has no edge (fees just make it worse). Kept in the code
+# for reference but off by default. Add it back with ENABLED=trend,scalp,forex.
+ENABLED = os.getenv("ENABLED", "trend,forex").split(",")
 
 # Shared realistic costs.
 FEE_PCT = 0.001                 # 0.1% per side
