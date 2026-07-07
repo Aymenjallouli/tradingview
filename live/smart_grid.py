@@ -211,12 +211,13 @@ class SmartGrid:
         # Create grids for newly picked coins.
         for s in picks:
             if s["symbol"] not in self.grids:
-                # Choose the number of levels so each grid step is ~0.5% — tight
-                # enough that normal minute-to-minute moves actually cross a
-                # line (with 20 levels over a wide range the steps were ~1.4%,
-                # so the price wiggled between lines forever and never filled).
+                # Grid step ~0.8%. Tuning on real data showed this is the sweet
+                # spot: tighter (0.3%) makes MORE trades but goes NEGATIVE (fees
+                # eat the tiny per-bounce profit — same lesson as the scalper);
+                # ~0.8% captures bigger bounces that clear the ~0.3% round-trip
+                # cost. Wider still (1.2%) trades too rarely. 0.8% won the test.
                 width_frac = (s["high"] - s["low"]) / s["low"] if s["low"] else 0.1
-                n_levels = max(20, min(120, int(width_frac / 0.005)))
+                n_levels = max(15, min(60, int(width_frac / 0.008)))
                 self.grids[s["symbol"]] = GridInstance(
                     s["symbol"], s["low"], s["high"], n_levels, self.per_grid)
                 _log(f"opening grid {s['symbol']} "
