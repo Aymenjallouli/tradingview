@@ -138,9 +138,10 @@ GRID2_ENABLED = os.getenv("GRID2_ENABLED", "1") not in ("0", "false", "False")
 CLAUDE_TRADER_ENABLED = os.getenv("CLAUDE_TRADER_ENABLED", "1") \
     not in ("0", "false", "False")
 
-# Claude live commentary — slowed to save rate limit. Default every 30 min.
-# Set CLAUDE_COMMENTARY=0 to turn it off entirely (keeps the trader running).
-CLAUDE_COMMENTARY_ENABLED = os.getenv("CLAUDE_COMMENTARY", "1") \
+# Claude live commentary — OFF by default now. It was just chatter burning the
+# Claude rate limit; the Claude Trader (actual experiment) uses the budget
+# instead. Set CLAUDE_COMMENTARY=1 to turn it back on.
+CLAUDE_COMMENTARY_ENABLED = os.getenv("CLAUDE_COMMENTARY", "0") \
     not in ("0", "false", "False")
 CLAUDE_COMMENTARY_SECONDS = int(os.getenv("CLAUDE_COMMENTARY_SECONDS", "1800"))
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")

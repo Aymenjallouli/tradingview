@@ -37,14 +37,29 @@ class ClaudeHelper:
     def __init__(self, engine, interval_seconds=180):
         self.engine = engine
         self.interval = interval_seconds
-        self.enabled = True     # set False to disable commentary entirely
+        self._enabled = True     # use the .enabled property below
+        self._running = False
+        self._thread = None
         self.latest = {
             "text": "Claude helper starting… (first read within a few minutes)",
             "at": None,
             "available": True,
         }
-        self._running = False
-        self._thread = None
+
+    @property
+    def enabled(self):
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, val):
+        self._enabled = val
+        if not val:
+            # Show the off-state immediately so the panel isn't confusing.
+            self.latest = {
+                "text": "Live commentary is off — all Claude budget goes to the "
+                        "🤖 Claude Trader (below), which decides on real trades "
+                        "every 2 hours.",
+                "at": None, "available": True}
 
     def start(self):
         if not self.enabled:
