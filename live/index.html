@@ -243,6 +243,16 @@
   .grid-head{font-size:13px;color:var(--muted);margin-bottom:12px;
     font-family:var(--mono)}
   .grid-head b{color:var(--text)}
+  .ct-mandate{font-size:11.5px;color:var(--muted);font-style:italic;
+    line-height:1.5;padding:10px 12px;background:var(--panel-2);
+    border:1px solid var(--line-soft);border-radius:var(--radius-sm);
+    margin-bottom:12px}
+  .ct-goal{font-size:13px;font-family:var(--mono);color:var(--text)}
+  .ct-goal .miss{color:var(--neg)}
+  .ct-goal b{font-weight:700}
+  #ct-log .dec{padding:7px 0;border-bottom:1px solid var(--line-soft)}
+  #ct-log .dec .assess{color:var(--info)}
+  #ct-log .dec .res{color:var(--muted)}
 
   @media (prefers-reduced-motion:reduce){*{transition:none!important;
     animation:none!important}}
@@ -283,6 +293,23 @@
   </div>
 
   <div class="grid" id="cards"></div>
+
+  <!-- Claude Trader (AI experiment) -->
+  <h3>🤖 Claude Trader — mandate: $50/day (experiment)</h3>
+  <div class="card" id="ctrader-card">
+    <div class="ct-mandate" id="ct-mandate"></div>
+    <div class="ct-goal" id="ct-goal">Starting up…</div>
+    <div class="scan-cols" style="margin-top:12px">
+      <div style="flex:1">
+        <div class="scan-sub">Open positions</div>
+        <table class="scan-table"><thead><tr>
+          <th>Coin</th><th>Entry</th><th>Now</th><th>P&L</th>
+        </tr></thead><tbody id="ct-positions"></tbody></table>
+      </div>
+    </div>
+    <div class="scan-sub" style="margin-top:12px">Decision log (reasoning + outcome)</div>
+    <div class="log" id="ct-log" style="max-height:220px"></div>
+  </div>
 
   <!-- Smart grid (most promising) -->
   <h3>📊 Smart Grid v2 — radar-fed, ranging coins only (our best edge)</h3>
@@ -540,6 +567,35 @@ function renderGrid(g){
     : `<tr><td colspan="3" class="empty">—</td></tr>`;
 }
 
+function renderCTrader(c){
+  if(!c){ return; }
+  $("ct-mandate").textContent = c.mandate;
+  if(c.frozen && c.epitaph){
+    $("ct-goal").innerHTML = `<b class="miss">💀 EXPERIMENT ENDED</b> — ${c.epitaph.why}.
+      Final equity $${c.equity.toFixed(2)}. Epitaph: "${c.epitaph.last_assessment||'—'}"`;
+  } else {
+    const d = c.equity - c.start_capital;
+    $("ct-goal").innerHTML =
+      `Day ${c.days.toFixed(1)} · equity <b class="${d>=0?'pos':'neg'}">$${c.equity.toFixed(2)}</b>
+       (${d>=0?'+':''}$${d.toFixed(2)}) · cumulative <b class="${c.cumulative_pnl_pct>=0?'pos':'neg'}">${c.cumulative_pnl_pct>=0?'+':''}${c.cumulative_pnl_pct}%</b><br>
+       <span class="miss">Goal pace: $50/day = needed +100%/day · actual: ${c.daily_pace_pct>=0?'+':''}${c.daily_pace_pct}%/day</span>`;
+  }
+  $("ct-positions").innerHTML = (c.positions||[]).length
+    ? c.positions.map(p=>`<tr><td>${p.symbol}</td>
+        <td>${p.entry}</td><td>${p.now}</td>
+        <td class="${p.pnl_pct>=0?'pos':'neg'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct}%</td></tr>`).join("")
+    : `<tr><td colspan="4" class="empty">no open positions</td></tr>`;
+  $("ct-log").innerHTML = (c.decisions||[]).length
+    ? c.decisions.map(d=>{
+        const t = (d.time||"").replace("T"," ").slice(5,16);
+        if(d.status) return `<div class="dec"><b>${t}</b> — ${d.status}</div>`;
+        const res = (d.results||[]).join(", ");
+        return `<div class="dec"><b>${t}</b> — <span class="res">${res||'hold'}</span>
+          <br><span class="assess">🧠 ${d.self_assessment||''}</span></div>`;
+      }).join("")
+    : `<div class="empty">No decisions yet — first one within ~2 hours.</div>`;
+}
+
 function renderGrid2(g){
   if(!g){ return; }
   const d = g.equity - g.start_capital;
@@ -582,6 +638,7 @@ function applySnapshot(s){
   safe(()=>renderHero(s), "hero");
   safe(()=>renderTicker(s.prices||{}, s.connected), "ticker");
   safe(()=>renderCards(s.strategies||[]), "cards");
+  safe(()=>renderCTrader(s.claude_trader), "ctrader");
   safe(()=>renderGrid(s.grid), "grid");
   safe(()=>renderGrid2(s.grid2), "grid2");
   safe(()=>renderScanner(s.scanner), "scanner");

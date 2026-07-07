@@ -27,6 +27,7 @@ from claude_helper import ClaudeHelper
 from scanner import Scanner
 from arb_monitor import ArbMonitor
 from smart_grid import SmartGrid
+from claude_trader import ClaudeTrader
 
 app = FastAPI(title="Real-Time Paper Trading Engine")
 
@@ -64,6 +65,11 @@ if config.GRID_ENABLED and config.GRID2_ENABLED:
     GRID2.source = "both"       # ranging + trending
     GRID2.account = "grid2"
 
+# Claude Trader: autonomous AI discretionary trader, own $50 paper account.
+# An honest experiment ("give AI $50 + a $50/day goal, record what happens").
+CTRADER = ClaudeTrader(ENGINE.broker, radar=SCANNER) \
+    if config.CLAUDE_TRADER_ENABLED else None
+
 
 @app.on_event("startup")
 def _start_engine():
@@ -79,6 +85,8 @@ def _start_engine():
         threading.Thread(target=GRID.run, daemon=True).start()
     if GRID2:
         threading.Thread(target=GRID2.run, daemon=True).start()
+    if CTRADER:
+        threading.Thread(target=CTRADER.run, daemon=True).start()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -120,6 +128,11 @@ def _enrich(snap):
             snap["grid2"] = GRID2.snapshot()
         except Exception as exc:  # noqa: BLE001
             print(f"[state] grid2 snapshot error: {exc}", flush=True)
+    if CTRADER:
+        try:
+            snap["claude_trader"] = CTRADER.snapshot()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[state] claude_trader snapshot error: {exc}", flush=True)
     return snap
 
 

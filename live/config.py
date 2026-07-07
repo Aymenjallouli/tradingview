@@ -131,5 +131,11 @@ GRID_PER = float(os.getenv("GRID_PER", "6"))
 GRID_RESCAN = int(os.getenv("GRID_RESCAN", "1800"))   # 30 min re-selection
 # Second grid engine: grids ranging + trending candidates (own paper account).
 GRID2_ENABLED = os.getenv("GRID2_ENABLED", "1") not in ("0", "false", "False")
+
+# Claude Trader: autonomous AI trader experiment ($50/day mandate, own account).
+# Uses your Claude subscription via `claude -p`. Default ON. Set to 0 to disable
+# if you're worried about Claude rate limits (decides every 2h by default).
+CLAUDE_TRADER_ENABLED = os.getenv("CLAUDE_TRADER_ENABLED", "1") \
+    not in ("0", "false", "False")
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8000"))
