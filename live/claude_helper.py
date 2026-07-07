@@ -86,28 +86,44 @@ class ClaudeHelper:
     def _call_claude(self, prompt):
         """Run `claude -p` and return its text, or an error string.
 
+        Env note: under pm2 the process may not inherit your interactive shell's
+        environment, so `claude` can't find its auth (~/.claude) or PATH. We
+        pass a full environment with HOME set so the CLI locates its credentials
+        the same way it does in your terminal. You can also set CLAUDE_BIN or
+        extra vars in ecosystem.config.js if your setup needs it.
+
         Windows note: `claude` is a .CMD, which subprocess can't launch as a
-        bare name. We use the resolved full path and run via the shell on
-        Windows so the .CMD is executed correctly.
+        bare name, so we run it via the shell there.
         """
-        if not CLAUDE_BIN:
-            return None   # CLI genuinely not installed
+        claude_bin = os.getenv("CLAUDE_BIN") or CLAUDE_BIN
+        if not claude_bin:
+            return None   # CLI genuinely not installed / not on PATH
+
+        # Build an environment the CLI can authenticate in. Start from the
+        # current process env and ensure HOME is present (claude reads
+        # ~/.claude from HOME).
+        env = dict(os.environ)
+        if "HOME" not in env and "USERPROFILE" in env:
+            env["HOME"] = env["USERPROFILE"]
+
         try:
             if IS_WINDOWS:
-                # Quote the path and pass the prompt as a single argument.
                 r = subprocess.run(
-                    f'"{CLAUDE_BIN}" -p {json.dumps(prompt)}',
-                    capture_output=True, text=True, timeout=120, shell=True)
+                    f'"{claude_bin}" -p {json.dumps(prompt)}',
+                    capture_output=True, text=True, timeout=120,
+                    shell=True, env=env)
             else:
                 r = subprocess.run(
-                    [CLAUDE_BIN, "-p", prompt],
-                    capture_output=True, text=True, timeout=120, shell=False)
+                    [claude_bin, "-p", prompt],
+                    capture_output=True, text=True, timeout=120,
+                    shell=False, env=env)
         except FileNotFoundError:
             return None
         except subprocess.TimeoutExpired:
             return "(Claude took too long this round; will try again.)"
         if r.returncode != 0:
-            return f"(Claude error: {(r.stderr or '').strip()[:150]})"
+            err = (r.stderr or r.stdout or "").strip()[:200]
+            return f"(Claude error: {err})"
         return r.stdout.strip()
 
     def _loop(self):

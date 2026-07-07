@@ -176,24 +176,47 @@ function renderTicker(prices, connected){
   prevPx = {...prices};
 }
 
+// Render one snapshot (used by BOTH the SSE stream and the polling fallback).
+function applySnapshot(s){
+  renderTicker(s.prices||{}, s.connected);
+  renderCards(s.strategies||[]);
+  if(s.claude){
+    $("claude-body").textContent = s.claude.text || "…";
+    $("claude-at").textContent = s.claude.at
+      ? "· updated "+s.claude.at.replace("T"," ").slice(11,19)+" UTC" : "";
+  }
+  $("log").innerHTML = (s.events||[]).map(e=>`<div>${e}</div>`).join("")
+    || `<div class="empty">Waiting for activity…</div>`;
+}
+
+let lastUpdate = 0;
+
+// Polling fallback: some proxies (e.g. Cloudflare quick tunnels) buffer SSE
+// streams, so the browser connects but never receives events. If we haven't
+// gotten an SSE update recently, poll /api/state directly. This guarantees the
+// dashboard fills in everywhere, tunnel or not.
+async function pollOnce(){
+  try{
+    const r = await fetch("/api/state", {cache:"no-store"});
+    const s = await r.json();
+    applySnapshot(s);
+    $("status").textContent = "● live"; $("status").className = "status on";
+  }catch(e){ /* ignore; SSE or next poll will catch up */ }
+}
+
 function connect(){
+  // Always poll immediately so the page fills in fast, even before SSE.
+  pollOnce();
   const es = new EventSource("/api/stream");
   es.onopen=()=>{$("status").textContent="● live";$("status").className="status on";};
-  es.onerror=()=>{$("status").textContent="reconnecting…";$("status").className="status";
-    es.close();setTimeout(connect,2000);};
+  es.onerror=()=>{$("status").textContent="live (polling)";
+    es.close();setTimeout(connect,3000);};
   es.addEventListener("update", ev=>{
-    const s = JSON.parse(ev.data);
-    renderTicker(s.prices||{}, s.connected);
-    renderCards(s.strategies||[]);
-    // Claude's live read
-    if(s.claude){
-      $("claude-body").textContent = s.claude.text || "…";
-      $("claude-at").textContent = s.claude.at
-        ? "· updated "+s.claude.at.replace("T"," ").slice(11,19)+" UTC" : "";
-    }
-    $("log").innerHTML = (s.events||[]).map(e=>`<div>${e}</div>`).join("")
-      || `<div class="empty">Waiting for activity…</div>`;
+    lastUpdate = Date.now();
+    applySnapshot(JSON.parse(ev.data));
   });
+  // Fallback poll every 3s if SSE hasn't delivered an update in that window.
+  setInterval(()=>{ if(Date.now()-lastUpdate > 3000) pollOnce(); }, 3000);
 }
 connect();
 </script>

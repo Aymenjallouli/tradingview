@@ -34,6 +34,13 @@ module.exports = {
         DASHBOARD_HOST: "0.0.0.0",  // reachable on the VPS (firewall it!)
         DASHBOARD_PORT: "8010",
         DATABASE_PATH: "live_trades.db",
+        // Claude live-commentary helper needs HOME so the `claude` CLI can find
+        // its saved login at ~/.claude (same as your site-bot setup). Set these
+        // to match YOUR VPS user. On your box HOME is /home/ubuntu.
+        HOME: "/home/ubuntu",
+        // If `claude` isn't on pm2's PATH, set the full path here. Find it on
+        // the VPS with:  which claude
+        // CLAUDE_BIN: "/home/ubuntu/.npm-global/bin/claude",
       },
     },
   ],
