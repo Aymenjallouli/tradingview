@@ -99,12 +99,19 @@ class ClaudeHelper:
         if not claude_bin:
             return None   # CLI genuinely not installed / not on PATH
 
-        # Build an environment the CLI can authenticate in. Start from the
-        # current process env and ensure HOME is present (claude reads
-        # ~/.claude from HOME).
+        # Build an environment the CLI can authenticate in. Supported ways:
+        #   1) CLAUDE_CODE_OAUTH_TOKEN in .env  <-- what your site-bot uses
+        #      (Claude Code subscription token, not the paid API). Passed through.
+        #   2) Your logged-in session: claude reads ~/.claude, found via HOME.
+        #   3) ANTHROPIC_API_KEY / CLAUDE_API_KEY token, if you use those.
+        # config.py already loaded .env, so os.environ has whatever you set.
         env = dict(os.environ)
         if "HOME" not in env and "USERPROFILE" in env:
             env["HOME"] = env["USERPROFILE"]
+        if "ANTHROPIC_API_KEY" not in env and env.get("CLAUDE_API_KEY"):
+            env["ANTHROPIC_API_KEY"] = env["CLAUDE_API_KEY"]
+        # CLAUDE_CODE_OAUTH_TOKEN is already in env if set in .env — the claude
+        # CLI reads it directly. Nothing extra to do; it's passed through here.
 
         try:
             if IS_WINDOWS:

@@ -5,6 +5,7 @@ websocket-client>=1.7.0 # live event-driven kline stream (no polling)
 yfinance>=1.5.0         # forex candles (no free forex tick feed exists)
 fastapi>=0.110.0        # dashboard web server
 uvicorn[standard]>=0.29.0  # ASGI server that runs FastAPI
+python-dotenv>=1.0.0    # loads the .env file (Claude token + settings)
 
 # NOTE: the Claude "helper" (live commentary) shells out to the `claude` CLI
 # from your Claude Code subscription — that is NOT a pip package. If `claude`

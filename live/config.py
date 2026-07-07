@@ -15,6 +15,15 @@ All paper money. No broker, no keys, no real funds.
 
 import os
 
+# Load a local .env file (if present) so you can keep tokens/settings out of
+# the code. Copy .env.example to .env and fill it in. Safe if python-dotenv
+# isn't installed or there's no .env — it just does nothing.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except Exception:  # noqa: BLE001
+    pass
+
 STARTING_CAPITAL = float(os.getenv("STARTING_CAPITAL", "50"))
 POSITION_SIZE_PCT = 0.95        # trend/forex sizing
 SCALP_POSITION_PCT = 0.30       # scalp sizing (smaller, more frequent)
