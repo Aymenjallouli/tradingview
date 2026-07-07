@@ -37,6 +37,7 @@ class ClaudeHelper:
     def __init__(self, engine, interval_seconds=180):
         self.engine = engine
         self.interval = interval_seconds
+        self.enabled = True     # set False to disable commentary entirely
         self.latest = {
             "text": "Claude helper starting… (first read within a few minutes)",
             "at": None,
@@ -46,6 +47,11 @@ class ClaudeHelper:
         self._thread = None
 
     def start(self):
+        if not self.enabled:
+            self.latest = {"text": "Live commentary is off (saving Claude "
+                           "rate limit). The Claude Trader still runs.",
+                           "at": None, "available": True}
+            return
         if self._running:
             return
         self._running = True

@@ -33,7 +33,10 @@ app = FastAPI(title="Real-Time Paper Trading Engine")
 
 # Claude Code as a near-real-time HELPER (commentary, not the trigger).
 # Uses the `claude` CLI (your subscription), not the paid API.
-HELPER = ClaudeHelper(ENGINE, interval_seconds=180)
+# Commentary cadence — slowed way down to save Claude rate limit (was every
+# 3 min = ~480 calls/day). Default 30 min. Set CLAUDE_COMMENTARY=0 to disable.
+HELPER = ClaudeHelper(ENGINE, interval_seconds=config.CLAUDE_COMMENTARY_SECONDS)
+HELPER.enabled = config.CLAUDE_COMMENTARY_ENABLED
 
 # Multi-market scanner: scans many liquid crypto markets, paper-trades the
 # Market RADAR (support role, no trading). Classifies markets as ranging /

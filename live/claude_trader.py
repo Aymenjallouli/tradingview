@@ -35,22 +35,28 @@ CLAUDE_BIN = shutil.which("claude")
 IS_WINDOWS = os.name == "nt"
 
 FEE = config.FEE_PCT
-START_CAPITAL = 50.0
-KILL_EQUITY = 10.0
+START_CAPITAL = float(os.getenv("CLAUDE_TRADER_CAPITAL", "100"))  # $100
+GOAL_PROFIT = float(os.getenv("CLAUDE_TRADER_GOAL", "50"))        # earn $50
+KILL_EQUITY = 20.0           # scaled with the larger capital
 MAX_POS_PCT = 0.50           # <=50% equity per position
 MAX_POSITIONS = 3
 DEFAULT_STOP = 0.05          # -5% applied if AI omits a stop
 DECISION_SECONDS = int(os.getenv("CLAUDE_TRADER_SECONDS", "7200"))  # 2h
 UNIVERSE_EXTRA = ["BTCUSDT", "ETHUSDT"]
 
+# Goal as a % of starting capital (earn $50 on $100 = +50% total, not per day —
+# a far more realistic target than the old $50/day).
+GOAL_PCT = GOAL_PROFIT / START_CAPITAL * 100
+
 MANDATE = (
-    "You manage $50 of paper money on real crypto prices. The owner's goal: "
-    "earn $50 per day. You choose trades at your own discretion. You may be "
-    "aggressive or cautious — your choices and their results are logged "
-    "permanently. Constraints you cannot override: spot only (no leverage, no "
-    "shorting), max 50% of current equity per position, max 3 open positions, "
-    "real fees and spread apply. If equity falls below $10 the experiment ends "
-    "permanently."
+    f"You manage ${START_CAPITAL:.0f} of paper money on real crypto prices. "
+    f"The owner's goal: grow it by ${GOAL_PROFIT:.0f} (reach "
+    f"${START_CAPITAL+GOAL_PROFIT:.0f}, a +{GOAL_PCT:.0f}% gain). You choose "
+    "trades at your own discretion — aggressive or cautious. Your choices and "
+    "results are logged permanently. Constraints you cannot override: spot only "
+    "(no leverage, no shorting), max 50% of current equity per position, max 3 "
+    f"open positions, real fees and spread apply. If equity falls below "
+    f"${KILL_EQUITY:.0f} the experiment ends permanently."
 )
 
 
@@ -88,6 +94,12 @@ class ClaudeTrader:
         self.radar = radar
         self.account = "claude_trader"
         self.broker.ensure_account(self.account)
+        # This account starts with the trader's OWN capital ($100), not the
+        # broker's default. Only set it if the account is fresh (no trades yet),
+        # so a restart doesn't reset a running experiment.
+        if not self.broker.trades(self.account) \
+                and not self.broker.open_positions(self.account):
+            self.broker._set_cash(self.account, START_CAPITAL)
         self.frozen = False
         self.started_at = _now()
         self.decisions = []          # rolling decision log (with outcomes)
@@ -323,7 +335,8 @@ class ClaudeTrader:
 
     def run(self):
         self._running = True
-        _log(f"Claude Trader started. Mandate: $50/day. Decision every "
+        _log(f"Claude Trader started. ${START_CAPITAL:.0f} capital, goal "
+             f"+${GOAL_PROFIT:.0f} (+{GOAL_PCT:.0f}%). Decision every "
              f"{DECISION_SECONDS//3600}h. One life, kill at ${KILL_EQUITY}.")
         # First decision shortly after boot.
         time.sleep(15)
@@ -366,8 +379,10 @@ class ClaudeTrader:
             "cash": round(self.broker.cash(self.account), 2),
             "days": round(days, 2),
             "cumulative_pnl_pct": round(pnl_pct, 2),
-            "daily_pace_pct": round(pnl_pct / days, 2) if days else 0.0,
-            "goal_daily_pct": 100.0,   # $50/day on $50 = +100%/day
+            "goal_profit": GOAL_PROFIT,
+            "goal_pct": round(GOAL_PCT, 1),
+            "goal_target_equity": START_CAPITAL + GOAL_PROFIT,
+            "progress_pct": round(pnl_pct / GOAL_PCT * 100, 1) if GOAL_PCT else 0,
             "positions": positions,
             "stats": self.broker.stats(self.account),
             "decisions": self.decisions[-15:][::-1],
@@ -378,10 +393,10 @@ class ClaudeTrader:
     def _verdict(self, equity, days):
         """Template-based (not AI) honest comparison line vs the mandate."""
         pnl = (equity / START_CAPITAL - 1) * 100
-        pace = pnl / days if days else 0
-        return (f"Day {days:.1f}: Claude Trader {pnl:+.1f}% "
-                f"({pace:+.1f}%/day) vs the +100%/day goal — "
-                f"{'on track' if pace >= 100 else 'far below (as expected — $50/day is unrealistic)'}")
+        progress = pnl / GOAL_PCT * 100 if GOAL_PCT else 0
+        return (f"Day {days:.1f}: {pnl:+.1f}% (${equity-START_CAPITAL:+.2f}) — "
+                f"{progress:.0f}% of the way to the +{GOAL_PCT:.0f}% "
+                f"(${GOAL_PROFIT:.0f}) goal")
 
 
 if __name__ == "__main__":

@@ -137,5 +137,11 @@ GRID2_ENABLED = os.getenv("GRID2_ENABLED", "1") not in ("0", "false", "False")
 # if you're worried about Claude rate limits (decides every 2h by default).
 CLAUDE_TRADER_ENABLED = os.getenv("CLAUDE_TRADER_ENABLED", "1") \
     not in ("0", "false", "False")
+
+# Claude live commentary — slowed to save rate limit. Default every 30 min.
+# Set CLAUDE_COMMENTARY=0 to turn it off entirely (keeps the trader running).
+CLAUDE_COMMENTARY_ENABLED = os.getenv("CLAUDE_COMMENTARY", "1") \
+    not in ("0", "false", "False")
+CLAUDE_COMMENTARY_SECONDS = int(os.getenv("CLAUDE_COMMENTARY_SECONDS", "1800"))
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8000"))

@@ -295,7 +295,7 @@
   <div class="grid" id="cards"></div>
 
   <!-- Claude Trader (AI experiment) -->
-  <h3>🤖 Claude Trader — mandate: $50/day (experiment)</h3>
+  <h3>🤖 Claude Trader — $100, goal: earn $50 (experiment)</h3>
   <div class="card" id="ctrader-card">
     <div class="ct-mandate" id="ct-mandate"></div>
     <div class="ct-goal" id="ct-goal">Starting up…</div>
@@ -575,10 +575,12 @@ function renderCTrader(c){
       Final equity $${c.equity.toFixed(2)}. Epitaph: "${c.epitaph.last_assessment||'—'}"`;
   } else {
     const d = c.equity - c.start_capital;
+    const prog = c.progress_pct||0;
     $("ct-goal").innerHTML =
       `Day ${c.days.toFixed(1)} · equity <b class="${d>=0?'pos':'neg'}">$${c.equity.toFixed(2)}</b>
-       (${d>=0?'+':''}$${d.toFixed(2)}) · cumulative <b class="${c.cumulative_pnl_pct>=0?'pos':'neg'}">${c.cumulative_pnl_pct>=0?'+':''}${c.cumulative_pnl_pct}%</b><br>
-       <span class="miss">Goal pace: $50/day = needed +100%/day · actual: ${c.daily_pace_pct>=0?'+':''}${c.daily_pace_pct}%/day</span>`;
+       (${d>=0?'+':''}$${d.toFixed(2)}) of $${(c.goal_target_equity||150).toFixed(0)} target<br>
+       Goal: earn $${(c.goal_profit||50).toFixed(0)} (+${(c.goal_pct||50).toFixed(0)}%) ·
+       progress: <b class="${prog>=0?'pos':'neg'}">${prog.toFixed(0)}%</b> there`;
   }
   $("ct-positions").innerHTML = (c.positions||[]).length
     ? c.positions.map(p=>`<tr><td>${p.symbol}</td>
