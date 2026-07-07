@@ -111,12 +111,12 @@ class ClaudeHelper:
                 r = subprocess.run(
                     f'"{claude_bin}" -p {json.dumps(prompt)}',
                     capture_output=True, text=True, timeout=120,
-                    shell=True, env=env)
+                    shell=True, env=env, stdin=subprocess.DEVNULL)
             else:
                 r = subprocess.run(
                     [claude_bin, "-p", prompt],
                     capture_output=True, text=True, timeout=120,
-                    shell=False, env=env)
+                    shell=False, env=env, stdin=subprocess.DEVNULL)
         except FileNotFoundError:
             return None
         except subprocess.TimeoutExpired:
