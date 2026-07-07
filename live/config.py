@@ -110,7 +110,7 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "live_trades.db")
 # ---------------------------------------------------------------------------
 # Market RADAR (support role, no trading). Classifies markets ranging/trending.
 SCAN_ENABLED = os.getenv("SCAN_ENABLED", "1") not in ("0", "false", "False")
-SCAN_TOP_N = int(os.getenv("SCAN_TOP_N", "30"))       # top liquid coins to scan
+SCAN_TOP_N = int(os.getenv("SCAN_TOP_N", "45"))       # top liquid coins to scan
 SCAN_TIMEFRAME = os.getenv("SCAN_TIMEFRAME", "1h")    # candle interval to score
 SCAN_SECONDS = int(os.getenv("SCAN_SECONDS", "600"))  # seconds between scans
 
@@ -121,8 +121,8 @@ ARB_ENABLED = os.getenv("ARB_ENABLED", "1") not in ("0", "false", "False")
 # strategy that showed a real edge in backtests (beat buy&hold on 8/10 coins).
 GRID_ENABLED = os.getenv("GRID_ENABLED", "1") not in ("0", "false", "False")
 GRID_SCAN_TOP = int(os.getenv("GRID_SCAN_TOP", "100"))
-GRID_COUNT = int(os.getenv("GRID_COUNT", "6"))     # fewer, higher-quality grids
-GRID_PER = float(os.getenv("GRID_PER", "8"))
+GRID_COUNT = int(os.getenv("GRID_COUNT", "8"))     # more grids = more action
+GRID_PER = float(os.getenv("GRID_PER", "6"))
 # How often to re-pick which coins get grids (rotate out coins that stopped
 # ranging, rotate in new qualifiers). NOTE: this is NOT how often grids trade —
 # grids trade every 15s (feed_prices). This only re-selects coins. 30min keeps

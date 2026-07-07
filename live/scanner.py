@@ -29,6 +29,11 @@ def _log(m):
 _SKIP = {"USDCUSDT", "USD1USDT", "RLUSDUSDT", "TUSDUSDT", "FDUSDUSDT",
          "BUSDUSDT", "DAIUSDT", "USDPUSDT", "EURUSDT", "AEURUSDT", "XUSDUSDT"}
 
+# Min 24h volume to be "liquid enough" to grid. $10M keeps ~45 coins in play
+# (vs only ~10 at $50M) while still avoiding illiquid junk. Env-overridable.
+import os as _os
+MIN_VOLUME = float(_os.getenv("GRID_MIN_VOLUME", "10000000"))
+
 
 def _ema(s, p):
     return s.ewm(span=p, adjust=False).mean()
@@ -79,7 +84,7 @@ class Scanner:
                         and t["symbol"].isascii() \
                         and t["symbol"].replace("USDT", "").isalnum():
                     vol = float(t["quoteVolume"])
-                    if vol >= 50_000_000:      # min $50M daily volume
+                    if vol >= MIN_VOLUME:      # liquid enough to grid safely
                         rows.append((t["symbol"], vol))
             rows.sort(key=lambda x: x[1], reverse=True)
             return rows[:self.top_n]           # [(symbol, volume), ...]
@@ -120,8 +125,11 @@ class Scanner:
         spread = self._spread_pct(sym)
 
         uptrend = ef > es and price > et
-        # RANGING: high choppiness AND not strongly trending.
-        ranging = chop > 0.9 and abs(price - es) / es < 0.05
+        # RANGING: choppy AND not strongly trending. Loosened (chop>0.85, band
+        # within 8% of the 50-EMA) so many more coins qualify — $50M/chop>0.9
+        # left only ~2 coins on a quiet day. Grid's range-break exit handles any
+        # that turn out to trend.
+        ranging = chop > 0.85 and abs(price - es) / es < 0.08
         regime = "TRENDING" if uptrend and not ranging \
             else ("RANGING" if ranging else "NEITHER")
         return {"symbol": sym, "price": price, "rsi": round(r, 1),
