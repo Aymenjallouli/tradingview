@@ -38,8 +38,11 @@ FEE = config.FEE_PCT
 START_CAPITAL = float(os.getenv("CLAUDE_TRADER_CAPITAL", "100"))  # $100
 GOAL_PROFIT = float(os.getenv("CLAUDE_TRADER_GOAL", "50"))        # earn $50
 KILL_EQUITY = 20.0           # scaled with the larger capital
-MAX_POS_PCT = 0.50           # <=50% equity per position
-MAX_POSITIONS = 3
+MAX_POS_PCT = float(os.getenv("CLAUDE_TRADER_MAX_POS_PCT", "0.50"))  # per position
+# No hard cap on the NUMBER of open positions (per user). It's still bounded in
+# practice by available cash and the per-position size. Set a high ceiling as a
+# safety backstop, not a real limit.
+MAX_POSITIONS = int(os.getenv("CLAUDE_TRADER_MAX_POSITIONS", "25"))
 DEFAULT_STOP = 0.05          # -5% applied if AI omits a stop
 DECISION_SECONDS = int(os.getenv("CLAUDE_TRADER_SECONDS", "7200"))  # 2h
 UNIVERSE_EXTRA = ["BTCUSDT", "ETHUSDT"]
@@ -54,8 +57,9 @@ MANDATE = (
     f"${START_CAPITAL+GOAL_PROFIT:.0f}, a +{GOAL_PCT:.0f}% gain). You choose "
     "trades at your own discretion — aggressive or cautious. Your choices and "
     "results are logged permanently. Constraints you cannot override: spot only "
-    "(no leverage, no shorting), max 50% of current equity per position, max 3 "
-    f"open positions, real fees and spread apply. If equity falls below "
+    f"(no leverage, no shorting), max {MAX_POS_PCT*100:.0f}% of current equity "
+    "per position, hold as many different coins as you like (bounded only by "
+    "your cash), real fees and spread apply. If equity falls below "
     f"${KILL_EQUITY:.0f} the experiment ends permanently."
 )
 
@@ -185,17 +189,32 @@ class ClaudeTrader:
 
     def _prompt(self, ctx):
         return (
-            MANDATE + "\n\n"
-            "Here is the current state (JSON):\n"
+            "You are a sharp, decisive crypto trader running a real experiment "
+            "with your own reputation on the line. Every decision you make is "
+            "logged forever and compared against systematic strategies and "
+            "buy-and-hold. This is your chance to prove an AI can actually "
+            "trade.\n\n"
+            + MANDATE + "\n\n"
+            "You have FULL discretion. Trade as many coins as you want, size "
+            "them how you see fit, be aggressive or patient — it's your call. "
+            "Think about: which coins have momentum or are oversold, how to "
+            "manage the positions you already hold, when to cut losers and let "
+            "winners run, and whether to concentrate or diversify. Don't just "
+            "camp on BTC/ETH — use the full list of coins available to you.\n\n"
+            "Current state (JSON — prices, your positions with P&L, cash, your "
+            "own recent decisions and their outcomes):\n"
             + json.dumps(ctx, indent=2) + "\n\n"
-            "Decide your actions. Respond with STRICT JSON only, no prose:\n"
-            '{ "actions": [ {"action":"buy|sell|hold","symbol":"BTCUSDT",'
-            '"size_pct":0-50,"stop_loss_pct":number,"take_profit_pct":number,'
-            '"reasoning":"1-2 sentences"} ], '
-            '"self_assessment":"1 sentence on how the goal is going" }\n'
-            "Rules: spot only; size_pct is % of current equity (<=50); at most "
-            "3 open positions; only symbols present in prices. If you hold, "
-            'use action "hold". Output JSON and nothing else.'
+            "Now make your move. Respond with STRICT JSON only, no prose:\n"
+            '{ "actions": [ {"action":"buy|sell|hold","symbol":"SOLUSDT",'
+            '"size_pct":0-' + str(int(MAX_POS_PCT * 100)) + ','
+            '"stop_loss_pct":number,"take_profit_pct":number,'
+            '"reasoning":"why this trade"} ], '
+            '"self_assessment":"1 sentence: how is the goal going and what\'s '
+            'your plan" }\n'
+            "Rules: spot only; size_pct is % of current equity (max "
+            + str(int(MAX_POS_PCT * 100)) + "% each); only symbols present in "
+            "the prices list; to keep a position use action \"hold\"; to exit "
+            "use \"sell\". Output JSON and nothing else."
         )
 
     def _call_claude(self, prompt):
