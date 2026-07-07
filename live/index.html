@@ -293,7 +293,7 @@
       <div style="flex:1">
         <div class="scan-sub">Active grids (live paper)</div>
         <table class="scan-table"><thead><tr>
-          <th>Coin</th><th>Range</th><th>Trades</th><th>Realized</th><th>Value</th>
+          <th>Coin</th><th>Trades</th><th>Realized</th><th>Unrealized</th><th>Held</th>
         </tr></thead><tbody id="grid-active"></tbody></table>
       </div>
       <div style="flex:1">
@@ -317,7 +317,7 @@
     <div class="scan-cols">
       <div style="flex:1"><div class="scan-sub">Active grids</div>
         <table class="scan-table"><thead><tr>
-          <th>Coin</th><th>Trades</th><th>Realized</th><th>Positions</th>
+          <th>Coin</th><th>Trades</th><th>Realized</th><th>Unreal</th><th>Held</th>
         </tr></thead><tbody id="grid2-active"></tbody></table>
       </div>
     </div>
@@ -517,16 +517,18 @@ function renderGrid(g){
   const d = g.equity - g.start_capital;
   const scanning = !g.last_scan;
   $("grid-head").innerHTML = scanning
-    ? `⏳ First scan in progress (ranking ~100 coins by choppiness — takes a couple of minutes)…`
-    : `Equity <b class="${d>=0?'pos':'neg'}">$${g.equity.toFixed(2)}</b>
-    (${d>=0?'+':''}$${d.toFixed(2)}) · ${g.total_trades} grid trades ·
-    realized <b class="${g.realized_pnl>=0?'pos':'neg'}">$${g.realized_pnl.toFixed(2)}</b> ·
-    ${(g.active_grids||[]).length} active grids`;
+    ? `⏳ First scan in progress…`
+    : `Equity <b class="${d>=0?'pos':'neg'}">$${g.equity.toFixed(2)}</b> ·
+    ${g.total_trades} trades ·
+    realized <b class="${g.realized_pnl>=0?'pos':'neg'}">${g.realized_pnl>=0?'+':''}$${g.realized_pnl.toFixed(3)}</b> +
+    unrealized <b class="${(g.unrealized_pnl||0)>=0?'pos':'neg'}">${(g.unrealized_pnl||0)>=0?'+':''}$${(g.unrealized_pnl||0).toFixed(3)}</b> =
+    <b class="${(g.total_pnl||0)>=0?'pos':'neg'}">${(g.total_pnl||0)>=0?'+':''}$${(g.total_pnl||0).toFixed(3)} total</b>`;
   $("grid-active").innerHTML = (g.active_grids||[]).length
     ? g.active_grids.map(a=>`<tr>
-        <td>${a.symbol}</td><td>${a.range}</td><td>${a.trades}</td>
-        <td class="${a.realized>=0?'pos':'neg'}">$${a.realized.toFixed(3)}</td>
-        <td>$${a.value.toFixed(2)}</td></tr>`).join("")
+        <td>${a.bagged?'⚠️ ':''}${a.symbol}</td><td>${a.trades}</td>
+        <td class="${a.realized>=0?'pos':'neg'}">${a.realized>=0?'+':''}$${a.realized.toFixed(3)}</td>
+        <td class="${(a.unrealized||0)>=0?'pos':'neg'}">${(a.unrealized||0)>=0?'+':''}$${(a.unrealized||0).toFixed(3)}</td>
+        <td>${a.holdings||0} held</td></tr>`).join("")
     : `<tr><td colspan="5" class="empty">scanning for ranging coins…</td></tr>`;
   // Second column: per-grid detail (spread + holdings) instead of the old
   // chop/width fields the v2 snapshot no longer carries.
@@ -543,16 +545,18 @@ function renderGrid2(g){
   const d = g.equity - g.start_capital;
   $("grid2-head").innerHTML = !g.last_scan
     ? `⏳ First scan…`
-    : `Equity <b class="${d>=0?'pos':'neg'}">$${g.equity.toFixed(2)}</b>
-       (${d>=0?'+':''}$${d.toFixed(2)}) · ${g.total_trades} trades ·
-       realized <b class="${g.realized_pnl>=0?'pos':'neg'}">$${g.realized_pnl.toFixed(2)}</b> ·
-       ${(g.active_grids||[]).length} grids`;
+    : `Equity <b class="${d>=0?'pos':'neg'}">$${g.equity.toFixed(2)}</b> ·
+       ${g.total_trades} trades ·
+       realized <b class="${g.realized_pnl>=0?'pos':'neg'}">${g.realized_pnl>=0?'+':''}$${g.realized_pnl.toFixed(3)}</b> +
+       unreal <b class="${(g.unrealized_pnl||0)>=0?'pos':'neg'}">${(g.unrealized_pnl||0)>=0?'+':''}$${(g.unrealized_pnl||0).toFixed(3)}</b> =
+       <b class="${(g.total_pnl||0)>=0?'pos':'neg'}">${(g.total_pnl||0)>=0?'+':''}$${(g.total_pnl||0).toFixed(3)}</b>`;
   $("grid2-active").innerHTML = (g.active_grids||[]).length
     ? g.active_grids.map(a=>`<tr>
-        <td>${a.symbol}</td><td>${a.trades}</td>
-        <td class="${a.realized>=0?'pos':'neg'}">$${a.realized.toFixed(3)}</td>
-        <td>${a.holdings||0} held</td></tr>`).join("")
-    : `<tr><td colspan="4" class="empty">scanning…</td></tr>`;
+        <td>${a.bagged?'⚠️ ':''}${a.symbol}</td><td>${a.trades}</td>
+        <td class="${a.realized>=0?'pos':'neg'}">${a.realized>=0?'+':''}$${a.realized.toFixed(3)}</td>
+        <td class="${(a.unrealized||0)>=0?'pos':'neg'}">${(a.unrealized||0)>=0?'+':''}$${(a.unrealized||0).toFixed(3)}</td>
+        <td>${a.holdings||0}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="empty">scanning…</td></tr>`;
 }
 
 function renderHero(s){

@@ -142,6 +142,15 @@ class GridInstance:
     def value(self, price):
         return self.cash + sum(h["qty"] * price for h in self.holdings.values())
 
+    def unrealized(self, price):
+        """Current gain/loss on HELD positions (value now minus what we paid).
+
+        This is the hidden number — a grid can show positive REALIZED P&L while
+        holding bags that are underwater. Surfacing it keeps the reporting
+        honest: total P&L = realized + unrealized.
+        """
+        return sum(h["qty"] * price - h["cost"] for h in self.holdings.values())
+
 
 class SmartGrid:
     def __init__(self, broker, scan_top=100, grids=8, per_grid=6.0,
@@ -338,6 +347,9 @@ class SmartGrid:
         equity = total_value + max(idle, 0)
         total_trades = sum(g.trades for g in self.grids.values())
         total_realized = sum(g.realized for g in self.grids.values())
+        total_unrealized = sum(
+            g.unrealized(self._last_prices.get(s, g.prev_price or g.low))
+            for s, g in self.grids.items())
         def fmt(v):
             # Adaptive decimals so micro-price coins (BONK/SHIB) aren't "0.0000".
             if v == 0:
@@ -350,8 +362,11 @@ class SmartGrid:
         active = [{
             "symbol": s, "trades": g.trades,
             "realized": round(g.realized, 4),
+            "unrealized": round(
+                g.unrealized(self._last_prices.get(s, g.prev_price or g.low)), 4),
             "value": round(g.value(self._last_prices.get(s, g.prev_price or g.low)), 2),
             "holdings": len(g.holdings),
+            "bagged": g.bagged,
             "range": f"{fmt(g.low)}-{fmt(g.high)}",
             "spread": round(g.spread * 100, 3),
         } for s, g in self.grids.items()]
@@ -361,6 +376,10 @@ class SmartGrid:
             "start_capital": self.start_capital,
             "total_trades": total_trades,
             "realized_pnl": round(total_realized, 4),
+            "unrealized_pnl": round(total_unrealized, 4),
+            # Total = realized (booked) + unrealized (open positions). THIS is
+            # the honest bottom line — nothing hidden in open bags.
+            "total_pnl": round(total_realized + total_unrealized, 4),
             "active_grids": active,
             "ranked": self.ranked,
         }
