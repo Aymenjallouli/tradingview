@@ -532,21 +532,26 @@ function renderHero(s){
     from $${start.toFixed(0)} deployed across ${n} trading strategies`;
 }
 
+// Safe-run each renderer so one bad panel can't blank the whole dashboard.
+function safe(fn, name){ try{ fn(); }catch(e){ console.error("render "+name+" failed:", e); } }
+
 // Render one snapshot (used by BOTH the SSE stream and the polling fallback).
 function applySnapshot(s){
-  renderHero(s);
-  renderTicker(s.prices||{}, s.connected);
-  renderCards(s.strategies||[]);
-  renderGrid(s.grid);
-  renderScanner(s.scanner);
-  renderArb(s.arb);
-  if(s.claude){
-    $("claude-body").textContent = s.claude.text || "…";
-    $("claude-at").textContent = s.claude.at
-      ? "· updated "+s.claude.at.replace("T"," ").slice(11,19)+" UTC" : "";
-  }
-  $("log").innerHTML = (s.events||[]).map(e=>`<div>${e}</div>`).join("")
-    || `<div class="empty">Waiting for activity…</div>`;
+  safe(()=>renderHero(s), "hero");
+  safe(()=>renderTicker(s.prices||{}, s.connected), "ticker");
+  safe(()=>renderCards(s.strategies||[]), "cards");
+  safe(()=>renderGrid(s.grid), "grid");
+  safe(()=>renderScanner(s.scanner), "scanner");
+  safe(()=>renderArb(s.arb), "arb");
+  safe(()=>{
+    if(s.claude){
+      $("claude-body").textContent = s.claude.text || "…";
+      $("claude-at").textContent = s.claude.at
+        ? "· updated "+s.claude.at.replace("T"," ").slice(11,19)+" UTC" : "";
+    }
+    $("log").innerHTML = (s.events||[]).map(e=>`<div>${e}</div>`).join("")
+      || `<div class="empty">Waiting for activity…</div>`;
+  }, "claude/log");
 }
 
 let lastUpdate = 0;
@@ -560,16 +565,21 @@ async function pollOnce(){
     const r = await fetch("/api/state", {cache:"no-store"});
     const s = await r.json();
     applySnapshot(s);
-    $("status").textContent = "● live"; $("status").className = "status on";
-  }catch(e){ /* ignore; SSE or next poll will catch up */ }
+    setStatus(true, "live");
+  }catch(e){ console.error("poll failed:", e); }
+}
+function setStatus(on, label){
+  const el = $("status");
+  el.className = "status" + (on ? " on" : "");
+  el.innerHTML = `<span class="dot"></span>${label}`;
 }
 
 function connect(){
   // Always poll immediately so the page fills in fast, even before SSE.
   pollOnce();
   const es = new EventSource("/api/stream");
-  es.onopen=()=>{$("status").textContent="● live";$("status").className="status on";};
-  es.onerror=()=>{$("status").textContent="live (polling)";
+  es.onopen=()=>setStatus(true, "live");
+  es.onerror=()=>{setStatus(true, "live · polling");
     es.close();setTimeout(connect,3000);};
   es.addEventListener("update", ev=>{
     lastUpdate = Date.now();
