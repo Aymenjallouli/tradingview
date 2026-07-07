@@ -1,0 +1,25 @@
+# Paper-trading system dependencies (Python 3.10+)
+# Install with:  pip install -r requirements.txt
+#
+# Versions are the ones this project was built and tested against. If a newer
+# release breaks something, pin back to these exact versions.
+
+# Data + math
+yfinance>=1.5.0        # downloads price candles from Yahoo Finance
+pandas>=2.0.0          # dataframes + indicator math
+numpy>=1.24.0          # numeric helpers (pulled in by pandas anyway)
+
+# Webhook server (Module 2 — optional, only needed for TradingView mode)
+fastapi>=0.110.0       # the web framework for the /webhook endpoint
+uvicorn[standard]>=0.29.0  # the server that runs the FastAPI app
+
+# Scalping experiment (the scalping/ subfolder)
+requests>=2.31.0       # calls the Binance public API (klines)
+matplotlib>=3.7.0      # saves the scalping equity-curve PNG (Module C)
+
+# Web dashboard (the dashboard/ subfolder) — reuses fastapi + uvicorn above
+websocket-client>=1.7.0  # live real-time price feed (Binance WebSocket)
+
+# NOTE: Module 5 (daily_review.py) shells out to the `claude` command from your
+# Claude Code subscription. That is NOT a pip package — install Claude Code
+# separately and sign in. See the README.

@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Paper Trading Dashboard</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#171b22; --panel2:#1e232c; --line:#2a303a;
+    --text:#e6e9ef; --muted:#8a93a2; --green:#3fb950; --red:#f85149;
+    --blue:#58a6ff; --amber:#d29922;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;
+    background:var(--bg);color:var(--text);font-size:14px}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:14px}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+  .dot.live{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .conn{margin-left:auto;color:var(--muted);font-size:12px}
+  main{padding:20px;max-width:1200px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:16px}
+  .card h2{margin:0 0 4px;font-size:14px}
+  .card .sub{color:var(--muted);font-size:12px;margin-bottom:12px}
+  .equity{font-size:26px;font-weight:700;margin:6px 0}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;
+    font-size:12px;margin:10px 0}
+  .stats span{color:var(--muted)}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+  canvas{width:100%;height:70px;display:block;margin-top:8px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    padding:7px 12px;border-radius:7px;cursor:pointer;font-size:12px}
+  button:hover{border-color:var(--blue)}
+  button.run{border-color:var(--green)} button.run:hover{background:#12341c}
+  button.stop{border-color:var(--red)} button.stop:hover{background:#3a1414}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .section-title{margin:26px 0 12px;font-size:13px;text-transform:uppercase;
+    letter-spacing:.5px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:500}
+  .badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;
+    border:1px solid var(--line);color:var(--muted)}
+  .badge.on{color:var(--green);border-color:var(--green)}
+  .log{background:#0a0d12;border:1px solid var(--line);border-radius:8px;
+    padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;
+    white-space:pre-wrap;max-height:260px;overflow:auto;color:#c9d1d9;
+    margin-top:8px}
+  .tabs{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+  .tabs button.active{border-color:var(--blue);color:var(--blue)}
+  .note{background:#1a2230;border:1px solid #2b3f5c;border-radius:8px;
+    padding:10px 12px;color:#a9c3e6;font-size:12px;margin-top:14px}
+  .ticker{display:flex;gap:18px;flex-wrap:wrap;margin:16px 0 4px;
+    padding:10px 14px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;align-items:center}
+  .tick{display:flex;align-items:center;gap:7px;font-size:13px}
+  .tick b{font-weight:600} .tick .px{font-family:ui-monospace,monospace}
+  .tick .up{color:var(--green)} .tick .down{color:var(--red)}
+  .feed-badge{margin-left:auto;font-size:11px;color:var(--muted)}
+  .feed-badge.on{color:var(--green)}
+</style>
+</head>
+<body>
+<header>
+  <div class="dot" id="pulse"></div>
+  <h1>Paper Trading Dashboard</h1>
+  <span class="conn" id="conn">connecting…</span>
+</header>
+
+<main>
+  <div class="note">
+    <b>Paper money only — real market data.</b> Prices stream live from Binance
+    (real ticks, no key). Open positions are marked to market in real time, so
+    equity moves with the actual market. Orders are still simulated.
+  </div>
+
+  <!-- Live price ticker -->
+  <div class="ticker" id="ticker"></div>
+
+  <!-- System cards -->
+  <div class="grid" id="cards"></div>
+
+  <!-- Controls -->
+  <div class="section-title">Live &amp; backtests</div>
+  <div class="card">
+    <div class="tabs" id="taskTabs"></div>
+    <div class="controls" id="taskControls"></div>
+    <div class="log" id="log">Select a task above to view its output.</div>
+  </div>
+
+  <!-- Recent trades -->
+  <div class="section-title">Recent trades (all systems)</div>
+  <div class="card">
+    <table id="tradesTable">
+      <thead><tr>
+        <th>System</th><th>Symbol</th><th>Strategy</th><th>Reason</th>
+        <th>Return</th><th>P&amp;L</th><th>Exit time</th>
+      </tr></thead>
+      <tbody id="tradesBody"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+const SYSTEMS = ["trend","scalp","forex"];
+let currentTask = null;
+let latest = {summary:null, tasks:null};
+let prevPrices = {};
+
+const TICKER_SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT"];
+
+function renderTicker(prices, connected){
+  const el = $("ticker");
+  let html = TICKER_SYMBOLS.map(sym=>{
+    const p = prices[sym];
+    if(p===undefined){ return `<div class="tick"><b>${sym}</b><span class="px">—</span></div>`; }
+    const prev = prevPrices[sym];
+    let dir = "";
+    if(prev!==undefined){ dir = p>prev ? "up" : (p<prev ? "down" : ""); }
+    return `<div class="tick"><b>${sym.replace("USDT","")}</b>
+      <span class="px ${dir}">$${p.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
+  }).join("");
+  html += `<span class="feed-badge ${connected?"on":""}">${connected?"● real-time feed live":"○ feed connecting…"}</span>`;
+  el.innerHTML = html;
+  prevPrices = {...prices};
+}
+
+// ---- tiny helpers --------------------------------------------------------
+const $ = id => document.getElementById(id);
+const money = v => (v>=0?"+":"") + "$" + v.toFixed(2);
+const cls = v => v>=0 ? "pos" : "neg";
+
+function sparkline(canvas, curve){
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width = canvas.clientWidth*2;
+  const h = canvas.height = 140;
+  ctx.clearRect(0,0,w,h);
+  if(!curve || curve.length<2){return;}
+  const min = Math.min(...curve), max = Math.max(...curve);
+  const range = (max-min)||1;
+  const start = curve[0];
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = curve[curve.length-1] >= start ? "#3fb950" : "#f85149";
+  ctx.beginPath();
+  curve.forEach((v,i)=>{
+    const x = i/(curve.length-1)*w;
+    const y = h - ((v-min)/range)*(h-10) - 5;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // baseline (starting capital)
+  const by = h - ((start-min)/range)*(h-10) - 5;
+  ctx.strokeStyle = "#3a414d"; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(0,by); ctx.lineTo(w,by); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ---- render system cards -------------------------------------------------
+function renderCards(summary){
+  const wrap = $("cards");
+  // build once, then update in place to avoid flicker
+  if(!wrap.dataset.built){
+    wrap.innerHTML = SYSTEMS.map(s=>`
+      <div class="card" data-sys="${s}">
+        <h2>${summary[s].label}</h2>
+        <div class="sub" id="sub-${s}"></div>
+        <div class="equity" id="eq-${s}">—</div>
+        <div class="stats" id="stats-${s}"></div>
+        <canvas id="spark-${s}"></canvas>
+      </div>`).join("");
+    wrap.dataset.built = "1";
+  }
+  SYSTEMS.forEach(s=>{
+    const d = summary[s];
+    // Live, mark-to-market equity from the server (uses real prices).
+    const equity = (d.live_equity!==undefined) ? d.live_equity
+      : d.cash + d.open_positions.reduce((a,p)=>a+p.qty*p.entry,0);
+    const pnl = equity - d.start_capital;
+    $("sub-"+s).textContent = d.exists
+      ? `${d.trades} trades · ${d.win_rate}% win · PF ${d.profit_factor??"∞"}`
+      : "no data yet — run a backtest or live trader";
+    const eqEl = $("eq-"+s);
+    eqEl.textContent = "$"+equity.toFixed(2);
+    eqEl.className = "equity " + cls(pnl);
+    // Unrealized P&L from open positions (real-time).
+    const unreal = d.open_positions.reduce((a,p)=>a+(p.unrealized||0),0);
+    const unrealHtml = d.open_positions.length
+      ? `<div><span>Unrealized</span></div><div class="${cls(unreal)}">${money(unreal)}</div>` : "";
+    $("stats-"+s).innerHTML = `
+      <div><span>Net P&L</span></div><div class="${cls(pnl)}">${money(pnl)}</div>
+      <div><span>Cash</span></div><div>$${d.cash.toFixed(2)}</div>
+      <div><span>Open pos</span></div><div>${d.open_positions.length}</div>
+      <div><span>Cost paid</span></div><div>$${d.total_cost.toFixed(2)}</div>
+      ${unrealHtml}`;
+    sparkline($("spark-"+s), d.equity_curve);
+  });
+}
+
+// ---- render trades -------------------------------------------------------
+function renderTrades(summary){
+  let rows = [];
+  SYSTEMS.forEach(s=>{
+    summary[s].recent_trades.forEach(t=> rows.push({sys:s, ...t}));
+  });
+  rows.sort((a,b)=> (b.exit_time||"").localeCompare(a.exit_time||""));
+  rows = rows.slice(0,30);
+  $("tradesBody").innerHTML = rows.map(t=>`
+    <tr>
+      <td>${t.sys}</td><td>${t.symbol}</td><td>${t.strategy||""}</td>
+      <td>${t.reason}</td>
+      <td class="${cls(t.return_pct)}">${t.return_pct>=0?"+":""}${t.return_pct}%</td>
+      <td class="${cls(t.pnl)}">${money(t.pnl)}</td>
+      <td>${(t.exit_time||"").replace("T"," ").slice(0,19)}</td>
+    </tr>`).join("") || `<tr><td colspan="7" style="color:var(--muted)">No trades yet.</td></tr>`;
+}
+
+// ---- task controls -------------------------------------------------------
+const TASK_GROUPS = {
+  "Trend": ["trend_backtest","trend_optimize","trend_signals"],
+  "Crypto scalp": ["scalp_backtest","scalp_live"],
+  "Forex": ["forex_backtest_both","forex_backtest_scalp","forex_backtest_swing",
+            "forex_optimize","forex_live_swing","forex_live_scalp"],
+};
+const LIVE_TASKS = new Set(["scalp_live","forex_live_swing","forex_live_scalp"]);
+
+function renderTasks(tasks){
+  // Tabs = one per task, grouped.
+  if(!$("taskTabs").dataset.built){
+    let html="";
+    for(const [group,keys] of Object.entries(TASK_GROUPS)){
+      keys.forEach(k=>{
+        html += `<button class="tab" data-task="${k}">${k}</button>`;
+      });
+    }
+    $("taskTabs").innerHTML = html;
+    $("taskTabs").dataset.built="1";
+    $("taskTabs").querySelectorAll("button").forEach(b=>{
+      b.onclick = ()=>{ currentTask=b.dataset.task; refreshLog(); renderControls();
+        $("taskTabs").querySelectorAll("button").forEach(x=>x.classList.remove("active"));
+        b.classList.add("active"); };
+    });
+    currentTask = "forex_backtest_both";
+    renderControls();
+  }
+  // update running badges on tabs
+  $("taskTabs").querySelectorAll("button").forEach(b=>{
+    const st = tasks[b.dataset.task];
+    b.style.borderColor = st && st.running ? "var(--green)" : "";
+  });
+  renderControls();
+}
+
+function renderControls(){
+  if(!currentTask){return;}
+  const st = latest.tasks ? latest.tasks[currentTask] : null;
+  const running = st && st.running;
+  const isLive = LIVE_TASKS.has(currentTask);
+  let html = `<button class="run" onclick="startTask('${currentTask}')" ${running?"disabled":""}>▶ ${isLive?"Start":"Run"}</button>`;
+  html += `<button class="stop" onclick="stopTask('${currentTask}')" ${running?"":"disabled"}>■ Stop</button>`;
+  html += `<span class="badge ${running?"on":""}">${running?"running":"idle"}</span>`;
+  $("taskControls").innerHTML = html;
+}
+
+async function startTask(k){ await fetch(`/api/tasks/${k}/start`,{method:"POST"}); refreshLog(); }
+async function stopTask(k){ await fetch(`/api/tasks/${k}/stop`,{method:"POST"}); refreshLog(); }
+
+async function refreshLog(){
+  if(!currentTask){return;}
+  const r = await fetch(`/api/tasks/${currentTask}/log?lines=200`);
+  const j = await r.json();
+  const el = $("log");
+  const atBottom = el.scrollTop+el.clientHeight >= el.scrollHeight-30;
+  el.textContent = j.log || "(no output yet)";
+  if(atBottom){ el.scrollTop = el.scrollHeight; }
+}
+
+// ---- realtime stream (SSE, not polling) ----------------------------------
+function connect(){
+  const es = new EventSource("/api/stream");
+  es.onopen = ()=>{ $("conn").textContent="● live"; $("pulse").classList.add("live"); };
+  es.onerror = ()=>{ $("conn").textContent="reconnecting…"; $("pulse").classList.remove("live");
+    es.close(); setTimeout(connect, 2000); };
+  es.addEventListener("update", ev=>{
+    const data = JSON.parse(ev.data);
+    latest.summary = data.summary; latest.tasks = data.tasks;
+    renderTicker(data.prices||{}, data.feed_connected);
+    renderCards(data.summary);
+    renderTrades(data.summary);
+    renderTasks(data.tasks);
+  });
+}
+connect();
+// refresh the visible log a few times a second while a task runs
+setInterval(refreshLog, 1500);
+</script>
+</body>
+</html>

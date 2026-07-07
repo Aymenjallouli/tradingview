@@ -1,0 +1,36 @@
+# systemd service for running the engine WITHOUT Docker (bare VPS).
+#
+# Use this if you'd rather not use Docker. Install steps:
+#   1. Copy the whole `live/` folder to the server, e.g. /opt/rt-trader
+#   2. Create a venv and install deps:
+#        cd /opt/rt-trader
+#        python3 -m venv .venv
+#        .venv/bin/pip install -r requirements.txt
+#   3. Edit the paths/User below if needed.
+#   4. sudo cp deploy/rt-paper-trader.service /etc/systemd/system/
+#      sudo systemctl daemon-reload
+#      sudo systemctl enable --now rt-paper-trader
+#   5. Check it:   systemctl status rt-paper-trader
+#      Logs:       journalctl -u rt-paper-trader -f
+#
+# It restarts automatically on crash and on server reboot.
+
+[Unit]
+Description=Real-Time Paper Trading Engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Change this to a non-root user you created for the app.
+User=trader
+WorkingDirectory=/opt/rt-trader
+Environment=DASHBOARD_HOST=0.0.0.0
+Environment=DASHBOARD_PORT=8000
+Environment=DATABASE_PATH=/opt/rt-trader/data/live_trades.db
+ExecStart=/opt/rt-trader/.venv/bin/python app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

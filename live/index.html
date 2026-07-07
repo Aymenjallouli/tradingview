@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Real-Time Paper Trader</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--panel2:#1c222b;--line:#2a2f3a;
+    --text:#e6edf3;--muted:#8b949e;--green:#3fb950;--red:#f85149;--blue:#58a6ff}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;
+    background:var(--bg);color:var(--text)}
+  header{padding:15px 22px;border-bottom:1px solid var(--line);display:flex;
+    align-items:center;gap:12px}
+  header h1{font-size:16px;margin:0}
+  .status{margin-left:auto;font-size:12px;color:var(--muted)}
+  .status.on{color:var(--green)}
+  main{max-width:1080px;margin:0 auto;padding:20px}
+  .note{background:#12233a;border:1px solid #234;border-radius:10px;
+    padding:11px 14px;color:#a9c3e6;font-size:12.5px;margin-bottom:16px}
+  .ticker{display:flex;gap:18px;flex-wrap:wrap;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:11px 15px;
+    margin-bottom:16px;font-size:13px}
+  .ticker b{color:var(--muted);font-weight:500;margin-right:6px}
+  .up{color:var(--green)}.down{color:var(--red)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:16px;display:flex;flex-direction:column}
+  .card h2{font-size:14px;margin:0 0 2px}
+  .card .tf{font-size:11px;color:var(--muted);margin-bottom:12px}
+  .equity{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .delta{font-size:13px;margin:2px 0 12px}
+  .pos{color:var(--green)}.neg{color:var(--red)}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:12px;
+    margin-bottom:10px}
+  .kv .k{color:var(--muted)}
+  .badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:9px;
+    border:1px solid var(--line);color:var(--muted);margin-bottom:10px;
+    width:fit-content}
+  .badge.proven{color:var(--green);border-color:var(--green)}
+  .badge.exp{color:#d29922;border-color:#d29922}
+  .brain{font-size:11px;background:#0e1420;border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px;margin-bottom:10px}
+  .brain .row{display:flex;justify-content:space-between;padding:1px 0;
+    color:var(--muted)}
+  .brain .row b{color:var(--text);font-weight:500}
+  .brain .why{color:var(--blue);margin-top:4px;font-style:italic}
+  .mini{font-size:11px;color:var(--muted);margin-top:auto;padding-top:8px;
+    border-top:1px solid var(--line)}
+  .mini .t{display:flex;justify-content:space-between;padding:2px 0}
+  h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;
+    color:var(--muted);margin:22px 0 10px}
+  .log{background:#0a0d12;border:1px solid var(--line);border-radius:10px;
+    padding:12px;font-family:ui-monospace,Consolas,monospace;font-size:12px;
+    max-height:240px;overflow:auto;color:#c9d1d9}
+  .log div{padding:2px 0}
+  .empty{color:var(--muted);font-size:12px;padding:6px 0}
+  .claude{background:linear-gradient(180deg,#1a1530,#161b22);
+    border:1px solid #3a2f5c;border-radius:12px;padding:14px 16px;
+    margin-bottom:16px}
+  .claude-head{font-size:12px;color:#b39ddb;font-weight:600;margin-bottom:6px}
+  .claude-head span{color:var(--muted);font-weight:400;font-size:11px}
+  .claude-body{font-size:13.5px;line-height:1.5;color:var(--text)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 Real-Time Paper Trader</h1>
+  <span class="status" id="status">connecting…</span>
+</header>
+<main>
+  <div class="note">
+    <b>Fake money, real markets.</b> Three strategies run side by side, each with
+    its own $<span id="cap">50</span>. Crypto is true real-time (Binance
+    WebSocket); forex refreshes ~every 60s. Watch each equity vs $50.
+  </div>
+
+  <div class="ticker" id="ticker"></div>
+
+  <div class="claude" id="claude">
+    <div class="claude-head">🧠 Claude's live read <span id="claude-at"></span></div>
+    <div class="claude-body" id="claude-body">Claude helper starting…</div>
+  </div>
+
+  <div class="grid" id="cards"></div>
+
+  <h3>Live activity (all strategies)</h3>
+  <div class="log" id="log"></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const money = v => (v>=0?"+":"")+"$"+Math.abs(v).toFixed(2);
+const cls = v => v>=0?"pos":"neg";
+let prevPx = {};
+
+const NOTES = {
+  trend: {badge:"proven", text:"Passed backtest (PF 1.37). Slow — a few trades/week."},
+  scalp: {badge:"exp", text:"Fast, trades often. Lost in backtest — watch costs bite."},
+  forex: {badge:"exp", text:"Tightest costs. Best economics of the three."},
+};
+
+function renderCards(strategies){
+  const wrap = $("cards");
+  if(!wrap.dataset.built){
+    wrap.innerHTML = strategies.map(s=>`
+      <div class="card" data-k="${s.key}">
+        <h2>${s.label}</h2>
+        <div class="tf">${s.market} · ${s.timeframe} candles</div>
+        <div class="badge ${NOTES[s.key]?.badge||''}">${NOTES[s.key]?.text||''}</div>
+        <div class="equity" id="eq-${s.key}">$50.00</div>
+        <div class="delta" id="dl-${s.key}">+$0.00 (0.0%)</div>
+        <div class="kv" id="kv-${s.key}"></div>
+        <div class="brain" id="brain-${s.key}"></div>
+        <div class="mini" id="mini-${s.key}"></div>
+      </div>`).join("");
+    wrap.dataset.built="1";
+  }
+  strategies.forEach(s=>{
+    const d = s.equity - s.start_capital;
+    const pct = (s.equity/s.start_capital-1)*100;
+    const eq=$("eq-"+s.key); eq.textContent="$"+s.equity.toFixed(2);
+    eq.className="equity "+cls(d);
+    const dl=$("dl-"+s.key);
+    dl.textContent=`${money(d)} (${pct>=0?"+":""}${pct.toFixed(1)}%)`;
+    dl.className="delta "+cls(d);
+    const st=s.stats;
+    $("kv-"+s.key).innerHTML=`
+      <div class="k">Closed trades</div><div>${st.trades}</div>
+      <div class="k">Win rate</div><div>${st.trades?st.win_rate+"%":"—"}</div>
+      <div class="k">Profit factor</div><div>${st.profit_factor??(st.trades?"∞":"—")}</div>
+      <div class="k">Open now</div><div>${s.positions.length}</div>
+      <div class="k">Cost paid</div><div>$${st.cost_paid.toFixed(2)}</div>`;
+    // brain: what the strategy is looking at right now
+    const brainEl = $("brain-"+s.key);
+    const syms = Object.keys(s.brain||{});
+    if(syms.length){
+      brainEl.innerHTML = syms.map(sym=>{
+        const b = s.brain[sym];
+        let rows = `<div class="row"><span>${sym} price</span><b>${b.price}</b></div>`;
+        if(b.rsi!==undefined && b.rsi!==null) rows += `<div class="row"><span>RSI</span><b>${b.rsi}</b></div>`;
+        if(b.lower_band) rows += `<div class="row"><span>lower band</span><b>${b.lower_band}</b></div>`;
+        if(b.ema_fast) rows += `<div class="row"><span>EMA fast/slow</span><b>${b.ema_fast} / ${b.ema_slow}</b></div>`;
+        rows += `<div class="why">🧠 ${b.waiting_for}</div>`;
+        return rows;
+      }).join("");
+    } else {
+      brainEl.innerHTML = `<div class="why">🧠 warming up — waiting for the next candle to close…</div>`;
+    }
+    // mini recent trades
+    const rt = s.recent_trades.slice(0,4);
+    $("mini-"+s.key).innerHTML = rt.length
+      ? rt.map(t=>`<div class="t"><span>${t.symbol} ${t.reason}</span>
+          <span class="${cls(t.pnl)}">${money(t.pnl)}</span></div>`).join("")
+      : (s.positions.length
+          ? s.positions.map(p=>`<div class="t"><span>holding ${p.symbol}</span>
+              <span class="${cls(p.unrealized)}">${money(p.unrealized)}</span></div>`).join("")
+          : `<div class="empty">no trades yet</div>`);
+  });
+}
+
+function renderTicker(prices, connected){
+  const syms = Object.keys(prices).sort();
+  let html = syms.map(sym=>{
+    const p = prices[sym];
+    const dir = prevPx[sym]!==undefined ? (p>prevPx[sym]?"up":(p<prevPx[sym]?"down":"")) : "";
+    return `<div><b>${sym}</b><span class="${dir}">${p.toLocaleString()}</span></div>`;
+  }).join("");
+  const c = connected||{};
+  html += `<div style="margin-left:auto;color:${c.crypto?'var(--green)':'var(--muted)'}">
+    ${c.crypto?"● crypto live":"○ crypto"}</div>`;
+  html += `<div style="color:${c.forex?'var(--green)':'var(--muted)'}">
+    ${c.forex?"● forex live":"○ forex"}</div>`;
+  $("ticker").innerHTML = html || `<div class="empty">waiting for prices…</div>`;
+  prevPx = {...prices};
+}
+
+function connect(){
+  const es = new EventSource("/api/stream");
+  es.onopen=()=>{$("status").textContent="● live";$("status").className="status on";};
+  es.onerror=()=>{$("status").textContent="reconnecting…";$("status").className="status";
+    es.close();setTimeout(connect,2000);};
+  es.addEventListener("update", ev=>{
+    const s = JSON.parse(ev.data);
+    renderTicker(s.prices||{}, s.connected);
+    renderCards(s.strategies||[]);
+    // Claude's live read
+    if(s.claude){
+      $("claude-body").textContent = s.claude.text || "…";
+      $("claude-at").textContent = s.claude.at
+        ? "· updated "+s.claude.at.replace("T"," ").slice(11,19)+" UTC" : "";
+    }
+    $("log").innerHTML = (s.events||[]).map(e=>`<div>${e}</div>`).join("")
+      || `<div class="empty">Waiting for activity…</div>`;
+  });
+}
+connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+# docker-compose for the real-time paper trading engine.
+#
+# On your VPS:   docker compose up -d --build
+# View logs:     docker compose logs -f
+# Stop:          docker compose down   (the database volume is kept)
+#
+# `restart: unless-stopped` means it comes back automatically after a crash or
+# a server reboot — exactly what you want for a 24/7 experiment.
+
+services:
+  trader:
+    build: .
+    container_name: rt-paper-trader
+    restart: unless-stopped
+    ports:
+      # host:container — change the LEFT number to expose a different port.
+      # Keep it firewalled or behind a reverse proxy on a public VPS.
+      - "8000:8000"
+    volumes:
+      # Persist the SQLite database on the host so trades survive redeploys.
+      - ./data:/data
+    environment:
+      # Override any config.py default here without editing code.
+      STARTING_CAPITAL: "50"
+      SYMBOLS: "BTCUSDT,ETHUSDT"
+      TIMEFRAME: "4h"
+      DATABASE_PATH: "/data/live_trades.db"
+      DASHBOARD_HOST: "0.0.0.0"
+      DASHBOARD_PORT: "8000"
