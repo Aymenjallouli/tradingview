@@ -62,6 +62,14 @@
   .claude-head{font-size:12px;color:#b39ddb;font-weight:600;margin-bottom:6px}
   .claude-head span{color:var(--muted);font-weight:400;font-size:11px}
   .claude-body{font-size:13.5px;line-height:1.5;color:var(--text)}
+  .scan-head{font-size:12px;color:var(--muted);margin-bottom:12px}
+  .scan-cols{display:flex;gap:24px;flex-wrap:wrap}
+  .scan-sub{font-size:11px;text-transform:uppercase;letter-spacing:.4px;
+    color:var(--muted);margin-bottom:6px}
+  .scan-table{width:100%;border-collapse:collapse;font-size:12px}
+  .scan-table th,.scan-table td{text-align:left;padding:5px 8px;
+    border-bottom:1px solid var(--line)}
+  .scan-table th{color:var(--muted);font-weight:500;font-size:10px}
 </style>
 </head>
 <body>
@@ -85,7 +93,27 @@
 
   <div class="grid" id="cards"></div>
 
-  <h3>Live activity (all strategies)</h3>
+  <!-- Scanner section -->
+  <h3>🔍 Market scanner — many markets, top signals</h3>
+  <div class="card" id="scanner-card">
+    <div class="scan-head" id="scan-head">Scanner warming up…</div>
+    <div class="scan-cols">
+      <div>
+        <div class="scan-sub">Scanner paper account</div>
+        <div class="equity" id="scan-eq">$50.00</div>
+        <div class="delta" id="scan-delta">+$0.00 (0.0%)</div>
+        <div class="kv" id="scan-kv"></div>
+      </div>
+      <div style="flex:1">
+        <div class="scan-sub">Top ranked markets right now</div>
+        <table class="scan-table"><thead><tr>
+          <th>Market</th><th>Score</th><th>RSI</th><th>Signal</th>
+        </tr></thead><tbody id="scan-ranked"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <h3>Live activity (all strategies + scanner)</h3>
   <div class="log" id="log"></div>
 </main>
 
@@ -176,10 +204,42 @@ function renderTicker(prices, connected){
   prevPx = {...prices};
 }
 
+function renderScanner(sc){
+  if(!sc){ return; }
+  const acc = sc.account || {};
+  const d = (acc.equity||50) - (acc.start_capital||50);
+  const pct = ((acc.equity||50)/(acc.start_capital||50)-1)*100;
+  $("scan-head").textContent = sc.last_scan
+    ? `Scanned ${sc.universe_size} markets · last scan ${sc.last_scan.replace("T"," ").slice(11,19)} UTC`
+    : "Scanner warming up… (first scan within a few minutes)";
+  const eq=$("scan-eq"); eq.textContent="$"+(acc.equity||50).toFixed(2);
+  eq.className="equity "+cls(d);
+  const dl=$("scan-delta");
+  dl.textContent=`${money(d)} (${pct>=0?"+":""}${pct.toFixed(1)}%)`;
+  dl.className="delta "+cls(d);
+  const st=acc.stats||{};
+  $("scan-kv").innerHTML=`
+    <div class="k">Closed trades</div><div>${st.trades||0}</div>
+    <div class="k">Win rate</div><div>${st.trades?st.win_rate+"%":"—"}</div>
+    <div class="k">Profit factor</div><div>${st.profit_factor??(st.trades?"∞":"—")}</div>
+    <div class="k">Open now</div><div>${(acc.positions||[]).length}</div>
+    <div class="k">Cost paid</div><div>$${(st.cost_paid||0).toFixed(2)}</div>`;
+  const ranked = sc.ranked||[];
+  $("scan-ranked").innerHTML = ranked.length
+    ? ranked.slice(0,10).map(r=>`<tr>
+        <td>${r.symbol}</td>
+        <td>${r.score}</td>
+        <td>${r.rsi}</td>
+        <td style="color:${r.score>5?'var(--green)':'var(--muted)'}">${r.reason}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="4" class="empty">No strong signals right now (market flat/down).</td></tr>`;
+}
+
 // Render one snapshot (used by BOTH the SSE stream and the polling fallback).
 function applySnapshot(s){
   renderTicker(s.prices||{}, s.connected);
   renderCards(s.strategies||[]);
+  renderScanner(s.scanner);
   if(s.claude){
     $("claude-body").textContent = s.claude.text || "…";
     $("claude-at").textContent = s.claude.at

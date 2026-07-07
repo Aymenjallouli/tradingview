@@ -24,12 +24,23 @@ import uvicorn
 import config
 from engine import ENGINE
 from claude_helper import ClaudeHelper
+from scanner import Scanner
 
 app = FastAPI(title="Real-Time Paper Trading Engine")
 
 # Claude Code as a near-real-time HELPER (commentary, not the trigger).
 # Uses the `claude` CLI (your subscription), not the paid API.
 HELPER = ClaudeHelper(ENGINE, interval_seconds=180)
+
+# Multi-market scanner: scans many liquid crypto markets, paper-trades the
+# strongest signals into its own account. Scanning is periodic; EXITS on held
+# positions are checked every 2s (near-realtime) so fills are close to what
+# real money would get. Enabled via SCAN_ENABLED env (default on).
+SCAN_ON = config.SCAN_ENABLED
+SCANNER = Scanner(ENGINE.broker, top_n=config.SCAN_TOP_N,
+                  hold_slots=config.SCAN_SLOTS,
+                  timeframe=config.SCAN_TIMEFRAME,
+                  scan_seconds=config.SCAN_SECONDS) if SCAN_ON else None
 
 
 @app.on_event("startup")
@@ -38,6 +49,8 @@ def _start_engine():
     t = threading.Thread(target=ENGINE.run, daemon=True)
     t.start()
     HELPER.start()
+    if SCANNER:
+        threading.Thread(target=SCANNER.run, daemon=True).start()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -48,11 +61,45 @@ def index():
         return f.read()
 
 
+def _enrich(snap):
+    """Add Claude + scanner data to an engine snapshot (used by both endpoints)."""
+    snap["claude"] = HELPER.snapshot()
+    if SCANNER:
+        # Scanner's own paper account, presented like a strategy card.
+        b = ENGINE.broker
+        prices = snap.get("prices", {})
+        # Value scanner positions at last scanned price (fallback to entry).
+        positions = []
+        equity = b.cash("scanner")
+        for p in b.open_positions("scanner"):
+            mark = SCANNER._last_prices.get(p["symbol"], p["fill_price"])
+            positions.append({
+                "symbol": p["symbol"], "entry": round(p["entry_price"], 6),
+                "price": round(mark, 6),
+                "unrealized": round((mark - p["fill_price"]) * p["qty"], 4)})
+            equity += p["qty"] * mark
+        snap["scanner"] = {
+            "account": {
+                "key": "scanner", "label": "Scanner (many markets)",
+                "market": "crypto", "timeframe": SCANNER.timeframe,
+                "cash": round(b.cash("scanner"), 2),
+                "equity": round(equity, 2),
+                "start_capital": config.STARTING_CAPITAL,
+                "positions": positions, "stats": b.stats("scanner"),
+                "recent_trades": [{
+                    "symbol": t["symbol"], "pnl": round(t["pnl"], 4),
+                    "return_pct": round(t["return_pct"] * 100, 2),
+                    "reason": t["exit_reason"], "exit_time": t["exit_time"],
+                } for t in b.trades("scanner")[-15:][::-1]],
+            },
+            **SCANNER.snapshot(),
+        }
+    return snap
+
+
 @app.get("/api/state")
 def state():
-    snap = ENGINE.snapshot()
-    snap["claude"] = HELPER.snapshot()
-    return JSONResponse(snap)
+    return JSONResponse(_enrich(ENGINE.snapshot()))
 
 
 @app.get("/api/stream")
@@ -65,14 +112,16 @@ async def stream():
         last = None
         ticks = 0
         while True:
-            snap = ENGINE.snapshot()
-            snap["claude"] = HELPER.snapshot()   # near-real-time commentary
+            snap = _enrich(ENGINE.snapshot())
             # Fingerprint on prices, per-strategy equity + trade counts.
             fp = json.dumps({
                 "px": snap["prices"], "conn": snap["connected"],
                 "s": [(s["key"], s["equity"], s["stats"]["trades"],
                        len(s["positions"])) for s in snap["strategies"]],
                 "claude_at": snap["claude"].get("at"),
+                "scan": (snap.get("scanner", {}).get("last_scan")),
+                "scan_eq": (snap.get("scanner", {}).get("account", {})
+                            .get("equity")),
             }, sort_keys=True)
             if fp != last or ticks % 5 == 0:
                 last = fp

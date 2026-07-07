@@ -101,5 +101,14 @@ FOREX_TARGET = 0.012           # +1.2%
 # ---------------------------------------------------------------------------
 WARMUP_CANDLES = 400
 DATABASE_PATH = os.getenv("DATABASE_PATH", "live_trades.db")
+
+# ---------------------------------------------------------------------------
+# Multi-market scanner (tests "scan many markets" theory with paper money)
+# ---------------------------------------------------------------------------
+SCAN_ENABLED = os.getenv("SCAN_ENABLED", "1") not in ("0", "false", "False")
+SCAN_TOP_N = int(os.getenv("SCAN_TOP_N", "40"))       # markets to scan
+SCAN_SLOTS = int(os.getenv("SCAN_SLOTS", "5"))        # max held positions
+SCAN_TIMEFRAME = os.getenv("SCAN_TIMEFRAME", "15m")   # candle interval to score
+SCAN_SECONDS = int(os.getenv("SCAN_SECONDS", "300"))  # seconds between scans
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8000"))
