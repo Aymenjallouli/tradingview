@@ -121,7 +121,8 @@ ARB_ENABLED = os.getenv("ARB_ENABLED", "1") not in ("0", "false", "False")
 # strategy that showed a real edge in backtests (beat buy&hold on 8/10 coins).
 GRID_ENABLED = os.getenv("GRID_ENABLED", "1") not in ("0", "false", "False")
 GRID_SCAN_TOP = int(os.getenv("GRID_SCAN_TOP", "100"))
-GRID_COUNT = int(os.getenv("GRID_COUNT", "8"))
-GRID_PER = float(os.getenv("GRID_PER", "6"))
+GRID_COUNT = int(os.getenv("GRID_COUNT", "6"))     # fewer, higher-quality grids
+GRID_PER = float(os.getenv("GRID_PER", "8"))
+GRID_RESCAN = int(os.getenv("GRID_RESCAN", "43200"))  # 12h rotation (spec)
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8000"))

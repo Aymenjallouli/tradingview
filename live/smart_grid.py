@@ -67,9 +67,12 @@ def choppiness(candles):
     return (1 - net / total) if total > 0 else 0.0
 
 
+RANGE_BREAK = 0.10   # liquidate a grid if price closes >10% outside its range
+
+
 class GridInstance:
-    """One live grid on one coin."""
-    def __init__(self, symbol, low, high, n_levels, capital):
+    """One live grid on one coin (v2: real spread cost + range-break exit)."""
+    def __init__(self, symbol, low, high, n_levels, capital, spread_side=0.0):
         self.symbol = symbol
         self.low, self.high, self.n = low, high, n_levels
         self.step = (high - low) / n_levels
@@ -77,10 +80,14 @@ class GridInstance:
         self.cash_per_level = capital / n_levels
         self.cash = capital
         self.capital = capital
-        self.holdings = {}          # level_index -> {qty, cost}
+        self.spread = spread_side       # per-side slippage (half bid-ask)
+        self.holdings = {}              # level_index -> {qty, cost}
         self.trades = 0
         self.realized = 0.0
         self.prev_price = None
+        self.bagged = False             # True once range broke + liquidated
+        self.break_lo = low * (1 - RANGE_BREAK)
+        self.break_hi = high * (1 + RANGE_BREAK)
 
     def on_price(self, price, low=None, high=None):
         """Feed a price + the price RANGE swept since the last check.
@@ -92,14 +99,30 @@ class GridInstance:
         candle). A buy fills if `low` reached a level; a sell fills if `high`
         reached the level above a holding. This is how real grid bots work.
         """
+        if self.bagged:
+            return
         lo = low if low is not None else price
         hi = high if high is not None else price
+        slip = self.spread if self.spread else SLIP   # real spread, else default
+
+        # RANGE-BREAK: if price closed >10% outside the range, liquidate the
+        # whole grid at market (with costs) and stop. Caps the downside instead
+        # of holding a bag all the way down.
+        if price < self.break_lo or price > self.break_hi:
+            for h in self.holdings.values():
+                px = price * (1 - slip)
+                self.cash += h["qty"] * px * (1 - FEE)
+            self.holdings = {}
+            self.bagged = True
+            self.prev_price = price
+            return
+
         # BUY: any level at or above `lo` (price dipped to it) we don't hold.
         for i in range(len(self.levels)):
             lvl = self.levels[i]
             if lo <= lvl <= hi and i not in self.holdings \
                     and self.cash >= self.cash_per_level - 1e-9:
-                fill = lvl * (1 + SLIP)
+                fill = lvl * (1 + slip)
                 fee = self.cash_per_level * FEE
                 qty = (self.cash_per_level - fee) / fill
                 self.holdings[i] = {"qty": qty, "cost": self.cash_per_level}
@@ -109,7 +132,7 @@ class GridInstance:
             sell_lvl = self.levels[min(i + 1, len(self.levels) - 1)]
             if hi >= sell_lvl > self.levels[i]:
                 h = self.holdings.pop(i)
-                fill = sell_lvl * (1 - SLIP)
+                fill = sell_lvl * (1 - slip)
                 net = h["qty"] * fill * (1 - FEE)
                 self.realized += net - h["cost"]
                 self.cash += net
@@ -163,68 +186,73 @@ class SmartGrid:
             _log(f"liquid list failed: {exc}")
             return []
 
+    def _spread_side(self, sym):
+        """Half the live bid-ask spread as a fraction (per-side slippage)."""
+        try:
+            d = requests.get(f"{config.BINANCE_REST}/api/v3/ticker/bookTicker",
+                            params={"symbol": sym}, timeout=8).json()
+            bid, ask = float(d["bidPrice"]), float(d["askPrice"])
+            return (ask - bid) / bid / 2 if bid > 0 else None
+        except Exception:  # noqa: BLE001
+            return None
+
     def scan_and_rotate(self):
-        """Rank ~100 coins by choppiness; (re)build grids on the top ones."""
-        universe = self._liquid()
-        if not universe:
-            return
-        scored = []
-        for sym in universe:
-            # Skip non-ASCII / junk ticker names (scam tokens like 币安人生USDT).
-            if not sym.isascii() or not sym.replace("USDT", "").isalnum():
-                continue
-            c = _klines(sym, "1h", 300)
-            if not c or len(c) < 100:
-                continue
-            chop = choppiness(c)
-            full_lo = min(x[1] for x in c)
-            full_hi = max(x[0] for x in c)
-            last = c[-1][2]
-            # Grid a TIGHT band around the CURRENT price (±8%), not the full
-            # multi-day range. A grid centered on the price means the price is
-            # always among active levels and crosses them as it wiggles. The
-            # full-range grid put price between far-apart lines that it rarely
-            # reached — which is why it never traded.
-            lo = last * 0.92
-            hi = last * 1.08
-            width = (full_hi - full_lo) / full_lo if full_lo else 0
-            scored.append({"symbol": sym, "chop": round(chop, 3),
-                           "low": lo, "high": hi, "width_pct": round(width*100, 1),
-                           "price": last,
-                           # eligible if it has real historical range to work with
-                           "eligible": width > 0.05})
-            time.sleep(0.01)   # light pacing; keep the scan reasonably fast
-        scored.sort(key=lambda x: x["chop"], reverse=True)
-        self.ranked = scored[:15]
+        """v2: only grid coins the RADAR flags as truly ranging + liquid +
+        tight spread. Uses real spread as slippage; range-break liquidation is
+        built into each grid. Falls back to its own liquid scan if no radar."""
+        # Preferred source: the radar's ranging watchlist (liquid, tight spread).
+        candidates = []
+        if self.radar is not None:
+            for c in self.radar.grid_candidates:
+                if c.get("grid_eligible"):
+                    candidates.append(c["symbol"])
+        # Fallback: scan liquid coins ourselves for choppiness.
+        if not candidates:
+            for sym in self._liquid():
+                if not sym.isascii() or not sym.replace("USDT", "").isalnum():
+                    continue
+                c = _klines(sym, "1h", 300)
+                if not c or len(c) < 100:
+                    continue
+                if choppiness(c[-200:]) > 0.9:
+                    candidates.append(sym)
+                if len(candidates) >= self.n_grids * 2:
+                    break
+
+        picks = candidates[:self.n_grids]
+        pick_set = set(picks)
+        self.ranked = [{"symbol": s} for s in picks]
         self.last_scan = datetime.now(timezone.utc).isoformat()
 
-        # Pick the top eligible coins.
-        picks = [s for s in scored if s["eligible"]][:self.n_grids]
-        pick_syms = {s["symbol"] for s in picks}
-
-        # Remove grids for coins no longer picked (bank their current value).
+        # Close grids no longer picked OR that got bagged (range broke).
         for sym in list(self.grids.keys()):
-            if sym not in pick_syms:
-                g = self.grids.pop(sym)
-                _log(f"closing grid {sym}: realized ${g.realized:+.2f} "
+            g = self.grids[sym]
+            if sym not in pick_set or g.bagged:
+                self.grids.pop(sym)
+                tag = "bagged (range broke)" if g.bagged else "rotated out"
+                _log(f"closing grid {sym} [{tag}]: realized ${g.realized:+.4f} "
                      f"in {g.trades} trades")
 
-        # Create grids for newly picked coins.
-        for s in picks:
-            if s["symbol"] not in self.grids:
-                # Grid step ~0.8%. Tuning on real data showed this is the sweet
-                # spot: tighter (0.3%) makes MORE trades but goes NEGATIVE (fees
-                # eat the tiny per-bounce profit — same lesson as the scalper);
-                # ~0.8% captures bigger bounces that clear the ~0.3% round-trip
-                # cost. Wider still (1.2%) trades too rarely. 0.8% won the test.
-                width_frac = (s["high"] - s["low"]) / s["low"] if s["low"] else 0.1
-                n_levels = max(15, min(60, int(width_frac / 0.008)))
-                self.grids[s["symbol"]] = GridInstance(
-                    s["symbol"], s["low"], s["high"], n_levels, self.per_grid)
-                _log(f"opening grid {s['symbol']} "
-                     f"range {s['low']:.6f}-{s['high']:.6f} "
-                     f"({n_levels} levels ~0.5% apart, "
-                     f"choppiness {s['chop']}, width {s['width_pct']}%)")
+        # Open grids for newly picked coins with REAL spread cost.
+        for sym in picks:
+            if sym in self.grids:
+                continue
+            c = _klines(sym, "1h", 5)
+            if not c:
+                continue
+            last = c[-1][2]
+            spread = self._spread_side(sym) or 0.0005
+            round_trip = 2 * (FEE + spread)
+            lo, hi = last * 0.92, last * 1.08
+            # Step >= 3x round-trip cost so bounces can clear costs.
+            min_step = 3 * round_trip
+            band = (hi - lo) / last
+            n_levels = max(8, min(40, int(band / max(min_step, 0.008))))
+            self.grids[sym] = GridInstance(sym, lo, hi, n_levels,
+                                           self.per_grid, spread_side=spread)
+            _log(f"opening grid {sym} range {lo:.6f}-{hi:.6f} "
+                 f"({n_levels} levels, spread {spread*100:.3f}%/side, "
+                 f"step>={min_step*100:.2f}%)")
 
     def feed_prices(self):
         """Push each grid coin's recent price RANGE (1m candles) into its grid.
@@ -247,9 +275,15 @@ class SmartGrid:
 
     def run(self):
         self._running = True
-        _log(f"Smart-grid started: scan top {self.scan_top}, "
-             f"{self.n_grids} grids, ${self.per_grid} each, "
-             f"rescan {self.rescan_seconds}s")
+        _log(f"Smart-grid v2 started: {self.n_grids} grids, "
+             f"${self.per_grid} each, radar-fed ranging coins, "
+             f"rescan {self.rescan_seconds}s, range-break exit at 10%")
+        # Ensure the radar has scanned at least once so we have candidates.
+        if self.radar is not None and not self.radar.grid_candidates:
+            try:
+                self.radar.scan_once()
+            except Exception:  # noqa: BLE001
+                pass
         self.scan_and_rotate()
         last_rescan = time.time()
         while self._running:
@@ -291,6 +325,7 @@ class SmartGrid:
             "value": round(g.value(self._last_prices.get(s, g.prev_price or g.low)), 2),
             "holdings": len(g.holdings),
             "range": f"{fmt(g.low)}-{fmt(g.high)}",
+            "spread": round(g.spread * 100, 3),
         } for s, g in self.grids.items()]
         return {
             "last_scan": self.last_scan,

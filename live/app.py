@@ -50,7 +50,7 @@ ARB = ArbMonitor(config.DATABASE_PATH) if config.ARB_ENABLED else None
 # radar's ranging watchlist during rotation.
 GRID = SmartGrid(ENGINE.broker, scan_top=config.GRID_SCAN_TOP,
                  grids=config.GRID_COUNT, per_grid=config.GRID_PER,
-                 radar=SCANNER) \
+                 radar=SCANNER, rescan_seconds=config.GRID_RESCAN) \
     if config.GRID_ENABLED else None
 
 
