@@ -35,21 +35,22 @@ app = FastAPI(title="Real-Time Paper Trading Engine")
 HELPER = ClaudeHelper(ENGINE, interval_seconds=180)
 
 # Multi-market scanner: scans many liquid crypto markets, paper-trades the
-# strongest signals into its own account. Scanning is periodic; EXITS on held
-# positions are checked every 2s (near-realtime) so fills are close to what
-# real money would get. Enabled via SCAN_ENABLED env (default on).
+# Market RADAR (support role, no trading). Classifies markets as ranging /
+# trending and produces watchlists the grid module consumes. Enabled via
+# SCAN_ENABLED (default on).
 SCAN_ON = config.SCAN_ENABLED
-SCANNER = Scanner(ENGINE.broker, top_n=config.SCAN_TOP_N,
-                  hold_slots=config.SCAN_SLOTS,
+SCANNER = Scanner(top_n=config.SCAN_TOP_N,
                   timeframe=config.SCAN_TIMEFRAME,
                   scan_seconds=config.SCAN_SECONDS) if SCAN_ON else None
 
 # Cross-exchange arbitrage monitor (honest experiment, never real money).
 ARB = ArbMonitor(config.DATABASE_PATH) if config.ARB_ENABLED else None
 
-# Smart-grid: our most promising strategy (grids on ranging coins).
+# Smart-grid: our most promising strategy (grids on ranging coins). It reads the
+# radar's ranging watchlist during rotation.
 GRID = SmartGrid(ENGINE.broker, scan_top=config.GRID_SCAN_TOP,
-                 grids=config.GRID_COUNT, per_grid=config.GRID_PER) \
+                 grids=config.GRID_COUNT, per_grid=config.GRID_PER,
+                 radar=SCANNER) \
     if config.GRID_ENABLED else None
 
 

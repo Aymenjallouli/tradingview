@@ -153,22 +153,22 @@
       trends. Paper money.</div>
   </div>
 
-  <!-- Scanner section -->
-  <h3>🔍 Market scanner — many markets, top signals</h3>
+  <!-- Radar section (support role, no trading) -->
+  <h3>📡 Market Radar — support (classifies markets, no trading)</h3>
   <div class="card" id="scanner-card">
-    <div class="scan-head" id="scan-head">Scanner warming up…</div>
+    <div class="scan-head" id="scan-head">Radar warming up…</div>
     <div class="scan-cols">
-      <div>
-        <div class="scan-sub">Scanner paper account</div>
-        <div class="equity" id="scan-eq">$50.00</div>
-        <div class="delta" id="scan-delta">+$0.00 (0.0%)</div>
-        <div class="kv" id="scan-kv"></div>
+      <div style="flex:1">
+        <div class="scan-sub">Grid candidates (ranging + liquid)</div>
+        <table class="scan-table"><thead><tr>
+          <th>Coin</th><th>Choppiness</th><th>Vol</th><th>Spread</th><th>OK?</th>
+        </tr></thead><tbody id="scan-grid-cands"></tbody></table>
       </div>
       <div style="flex:1">
-        <div class="scan-sub">Top ranked markets right now</div>
+        <div class="scan-sub">Trend candidates (uptrend + liquid)</div>
         <table class="scan-table"><thead><tr>
-          <th>Market</th><th>Score</th><th>RSI</th><th>Signal</th>
-        </tr></thead><tbody id="scan-ranked"></tbody></table>
+          <th>Coin</th><th>RSI</th><th>Vol</th><th>Spread</th>
+        </tr></thead><tbody id="scan-trend-cands"></tbody></table>
       </div>
     </div>
   </div>
@@ -289,33 +289,26 @@ function renderTicker(prices, connected){
 
 function renderScanner(sc){
   if(!sc){ return; }
-  const acc = sc.account || {};
-  const d = (acc.equity||50) - (acc.start_capital||50);
-  const pct = ((acc.equity||50)/(acc.start_capital||50)-1)*100;
   $("scan-head").textContent = sc.last_scan
-    ? `Scanned ${sc.universe_size} markets · last scan ${sc.last_scan.replace("T"," ").slice(11,19)} UTC`
-    : "Scanner warming up… (first scan within a few minutes)";
-  const eq=$("scan-eq"); eq.textContent="$"+(acc.equity||50).toFixed(2);
-  eq.className="equity "+cls(d);
-  const dl=$("scan-delta");
-  dl.textContent=`${money(d)} (${pct>=0?"+":""}${pct.toFixed(1)}%)`;
-  dl.className="delta "+cls(d);
-  const st=acc.stats||{};
-  $("scan-kv").innerHTML=`
-    <div class="k">Closed trades</div><div>${st.trades||0}</div>
-    <div class="k">Win rate</div><div>${st.trades?st.win_rate+"%":"—"}</div>
-    <div class="k">Profit factor</div><div>${st.profit_factor??(st.trades?"∞":"—")}</div>
-    <div class="k">Open now</div><div>${(acc.positions||[]).length}</div>
-    <div class="k">Cost paid</div><div>$${(st.cost_paid||0).toFixed(2)}</div>`;
-  const ranked = sc.ranked||[];
-  $("scan-ranked").innerHTML = ranked.length
-    ? ranked.slice(0,10).map(r=>`<tr>
-        <td>${r.symbol}</td>
-        <td>${r.score}</td>
-        <td>${r.rsi}</td>
-        <td style="color:${r.score>5?'var(--green)':'var(--muted)'}">${r.reason}</td>
+    ? `Support radar · last scan ${sc.last_scan.replace("T"," ").slice(11,19)} UTC · classifies markets, does not trade`
+    : "Radar warming up… (first scan within a few minutes)";
+  const gc = sc.grid_candidates||[];
+  $("scan-grid-cands").innerHTML = gc.length
+    ? gc.slice(0,8).map(c=>`<tr>
+        <td>${c.symbol}</td><td>${c.chop}</td>
+        <td>$${c.vol_m}M</td>
+        <td>${c.spread_pct!=null?c.spread_pct+"%":"—"}</td>
+        <td style="color:${c.grid_eligible?'var(--green)':'var(--red)'}">${c.grid_eligible?'✓':'spread'}</td>
       </tr>`).join("")
-    : `<tr><td colspan="4" class="empty">No strong signals right now (market flat/down).</td></tr>`;
+    : `<tr><td colspan="5" class="empty">no ranging coins right now</td></tr>`;
+  const tc = sc.trend_candidates||[];
+  $("scan-trend-cands").innerHTML = tc.length
+    ? tc.slice(0,8).map(c=>`<tr>
+        <td>${c.symbol}</td><td>${c.rsi}</td>
+        <td>$${c.vol_m}M</td>
+        <td>${c.spread_pct!=null?c.spread_pct+"%":"—"}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="4" class="empty">no trending coins right now</td></tr>`;
 }
 
 function renderArb(a){
@@ -372,18 +365,16 @@ function renderGrid(g){
 
 function renderHero(s){
   // Total across every paper account: strategies + grid + scanner.
-  let total = 0, start = 0;
-  (s.strategies||[]).forEach(x=>{ total += x.equity; start += x.start_capital; });
-  if(s.grid){ total += s.grid.equity; start += s.grid.start_capital; }
-  if(s.scanner && s.scanner.equity!==undefined){
-    total += s.scanner.equity; start += (s.scanner.start_capital||50);
-  }
+  let total = 0, start = 0, n = 0;
+  (s.strategies||[]).forEach(x=>{ total += x.equity; start += x.start_capital; n++; });
+  if(s.grid){ total += s.grid.equity; start += s.grid.start_capital; n++; }
+  // Radar (scanner) no longer trades — not counted in portfolio value.
   const d = total - start;
   const pct = start? (total/start-1)*100 : 0;
   $("hero-total").textContent = "$"+total.toFixed(2);
   $("hero-total").className = "hero-value "+(d>=0?"pos":"neg");
   $("hero-sub").innerHTML = `${d>=0?'+':''}$${d.toFixed(2)} (${pct>=0?'+':''}${pct.toFixed(2)}%)
-    from $${start.toFixed(0)} deployed across ${(s.strategies||[]).length + (s.grid?1:0) + (s.scanner?1:0)} strategies`;
+    from $${start.toFixed(0)} deployed across ${n} trading strategies`;
 }
 
 // Render one snapshot (used by BOTH the SSE stream and the polling fallback).

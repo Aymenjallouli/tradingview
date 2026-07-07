@@ -122,7 +122,7 @@ class GridInstance:
 
 class SmartGrid:
     def __init__(self, broker, scan_top=100, grids=8, per_grid=6.0,
-                 rescan_seconds=1800, price_seconds=15):
+                 rescan_seconds=1800, price_seconds=15, radar=None):
         """
         broker         : MultiBroker (uses a 'grid' summary; grids tracked here)
         scan_top       : how many liquid coins to scan for rangeyness
@@ -137,6 +137,7 @@ class SmartGrid:
         self.per_grid = per_grid
         self.rescan_seconds = rescan_seconds
         self.price_seconds = price_seconds
+        self.radar = radar          # optional Scanner for ranging watchlist
         self.grids = {}             # symbol -> GridInstance
         self.ranked = []            # latest choppiness ranking for the UI
         self.start_capital = grids * per_grid

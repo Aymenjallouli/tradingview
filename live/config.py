@@ -108,11 +108,11 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "live_trades.db")
 # ---------------------------------------------------------------------------
 # Multi-market scanner (tests "scan many markets" theory with paper money)
 # ---------------------------------------------------------------------------
+# Market RADAR (support role, no trading). Classifies markets ranging/trending.
 SCAN_ENABLED = os.getenv("SCAN_ENABLED", "1") not in ("0", "false", "False")
-SCAN_TOP_N = int(os.getenv("SCAN_TOP_N", "40"))       # markets to scan
-SCAN_SLOTS = int(os.getenv("SCAN_SLOTS", "5"))        # max held positions
-SCAN_TIMEFRAME = os.getenv("SCAN_TIMEFRAME", "15m")   # candle interval to score
-SCAN_SECONDS = int(os.getenv("SCAN_SECONDS", "300"))  # seconds between scans
+SCAN_TOP_N = int(os.getenv("SCAN_TOP_N", "50"))       # top liquid coins to scan
+SCAN_TIMEFRAME = os.getenv("SCAN_TIMEFRAME", "1h")    # candle interval to score
+SCAN_SECONDS = int(os.getenv("SCAN_SECONDS", "600"))  # seconds between scans
 
 # Cross-exchange arbitrage monitor (honest experiment — observes only).
 ARB_ENABLED = os.getenv("ARB_ENABLED", "1") not in ("0", "false", "False")
