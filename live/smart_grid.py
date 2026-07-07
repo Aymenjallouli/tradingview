@@ -82,25 +82,32 @@ class GridInstance:
         self.realized = 0.0
         self.prev_price = None
 
-    def on_price(self, price):
-        """Feed a fresh price; fill buys/sells that the move triggers."""
-        if self.prev_price is None:
-            self.prev_price = price
-            return
-        # BUY: price crossed DOWN through a level.
+    def on_price(self, price, low=None, high=None):
+        """Feed a price + the price RANGE swept since the last check.
+
+        BUG FIX: polling only the instantaneous price every 15s missed almost
+        every fill — the price rarely jumps a full ~1.4% level in one poll, it
+        wiggles within a cell. So we now fill any level the price actually
+        TOUCHED between polls, using the low/high of the interval (from a 1m
+        candle). A buy fills if `low` reached a level; a sell fills if `high`
+        reached the level above a holding. This is how real grid bots work.
+        """
+        lo = low if low is not None else price
+        hi = high if high is not None else price
+        # BUY: any level at or above `lo` (price dipped to it) we don't hold.
         for i in range(len(self.levels)):
             lvl = self.levels[i]
-            if self.prev_price > lvl >= price and i not in self.holdings \
+            if lo <= lvl <= hi and i not in self.holdings \
                     and self.cash >= self.cash_per_level - 1e-9:
                 fill = lvl * (1 + SLIP)
                 fee = self.cash_per_level * FEE
                 qty = (self.cash_per_level - fee) / fill
                 self.holdings[i] = {"qty": qty, "cost": self.cash_per_level}
                 self.cash -= self.cash_per_level
-        # SELL: price crossed UP to the next level above a holding.
+        # SELL: any holding whose next level up was reached by `hi`.
         for i in list(self.holdings.keys()):
             sell_lvl = self.levels[min(i + 1, len(self.levels) - 1)]
-            if price >= sell_lvl > self.levels[i]:
+            if hi >= sell_lvl > self.levels[i]:
                 h = self.holdings.pop(i)
                 fill = sell_lvl * (1 - SLIP)
                 net = h["qty"] * fill * (1 - FEE)
@@ -169,16 +176,22 @@ class SmartGrid:
             if not c or len(c) < 100:
                 continue
             chop = choppiness(c)
-            lo = min(x[1] for x in c)
-            hi = max(x[0] for x in c)
+            full_lo = min(x[1] for x in c)
+            full_hi = max(x[0] for x in c)
             last = c[-1][2]
-            # Only grid coins whose current price sits INSIDE their range and
-            # that have a meaningful range width (>3%) to profit from.
-            width = (hi - lo) / lo if lo else 0
-            in_range = lo < last < hi
+            # Grid a TIGHT band around the CURRENT price (±8%), not the full
+            # multi-day range. A grid centered on the price means the price is
+            # always among active levels and crosses them as it wiggles. The
+            # full-range grid put price between far-apart lines that it rarely
+            # reached — which is why it never traded.
+            lo = last * 0.92
+            hi = last * 1.08
+            width = (full_hi - full_lo) / full_lo if full_lo else 0
             scored.append({"symbol": sym, "chop": round(chop, 3),
                            "low": lo, "high": hi, "width_pct": round(width*100, 1),
-                           "price": last, "eligible": in_range and width > 0.03})
+                           "price": last,
+                           # eligible if it has real historical range to work with
+                           "eligible": width > 0.05})
             time.sleep(0.01)   # light pacing; keep the scan reasonably fast
         scored.sort(key=lambda x: x["chop"], reverse=True)
         self.ranked = scored[:15]
@@ -198,29 +211,37 @@ class SmartGrid:
         # Create grids for newly picked coins.
         for s in picks:
             if s["symbol"] not in self.grids:
+                # Choose the number of levels so each grid step is ~0.5% — tight
+                # enough that normal minute-to-minute moves actually cross a
+                # line (with 20 levels over a wide range the steps were ~1.4%,
+                # so the price wiggled between lines forever and never filled).
+                width_frac = (s["high"] - s["low"]) / s["low"] if s["low"] else 0.1
+                n_levels = max(20, min(120, int(width_frac / 0.005)))
                 self.grids[s["symbol"]] = GridInstance(
-                    s["symbol"], s["low"], s["high"], 20, self.per_grid)
+                    s["symbol"], s["low"], s["high"], n_levels, self.per_grid)
                 _log(f"opening grid {s['symbol']} "
-                     f"range {s['low']:.4f}-{s['high']:.4f} "
-                     f"(choppiness {s['chop']}, width {s['width_pct']}%)")
+                     f"range {s['low']:.6f}-{s['high']:.6f} "
+                     f"({n_levels} levels ~0.5% apart, "
+                     f"choppiness {s['chop']}, width {s['width_pct']}%)")
 
     def feed_prices(self):
-        """Push latest prices into every active grid (drives fills)."""
+        """Push each grid coin's recent price RANGE (1m candles) into its grid.
+
+        We fetch the last few 1-minute candles per coin and feed their low/high
+        so the grid fills every level the price actually touched between polls —
+        not just the instantaneous snapshot (which missed nearly all fills).
+        """
         if not self.grids:
             return
-        syms = list(self.grids.keys())
-        try:
-            import json as _json
-            resp = requests.get(f"{config.BINANCE_REST}/api/v3/ticker/price",
-                                params={"symbols": _json.dumps(syms)}, timeout=10)
-            prices = {d["symbol"]: float(d["price"]) for d in resp.json()}
-        except Exception:  # noqa: BLE001
-            return
-        for sym, g in self.grids.items():
-            p = prices.get(sym)
-            if p:
-                self._last_prices[sym] = p
-                g.on_price(p)
+        for sym, g in list(self.grids.items()):
+            candles = _klines(sym, "1m", 3)   # last ~3 minutes of range
+            if not candles:
+                continue
+            last_close = candles[-1][2]
+            self._last_prices[sym] = last_close
+            # Feed each recent candle's (low, high, close) in order.
+            for hi, lo, close in candles:
+                g.on_price(close, low=lo, high=hi)
 
     def run(self):
         self._running = True
