@@ -389,8 +389,9 @@
       <th>Symbol</th><th>Route</th><th>Trigger net</th><th>Fill net</th><th>Fate</th><th>Lifetime</th>
     </tr></thead><tbody id="arb-recent"></tbody></table>
     <div class="arb-caveat">Assumes capital pre-parked on both exchanges;
-      real transfers take minutes. Fills use post-2.5s re-checked prices, bid/ask
-      only, costs on both sides. Observes only — never trades.</div>
+      real transfers take minutes. Fills use post-delay re-checked prices, bid/ask
+      only, costs on both sides. Note: gaps die on FEES, not latency — the spread
+      matrix is net-negative before any delay. Observes only — never trades.</div>
   </div>
 
   <h3>Live activity (all strategies + scanner)</h3>
@@ -516,7 +517,7 @@ function renderArb(a){
     <div class="arb-arrow">→</div>
     <div class="arb-step"><div class="n">${f.net_positive||0}</div><div class="l">net-positive after costs</div></div>
     <div class="arb-arrow">→</div>
-    <div class="arb-step"><div class="n" style="color:${f.survived>0?'var(--green)':'var(--red)'}">${f.survived||0}</div><div class="l">survived 2.5s latency</div></div>`;
+    <div class="arb-step"><div class="n" style="color:${f.survived>0?'var(--green)':'var(--red)'}">${f.survived||0}</div><div class="l">survived ${a.delay_s||0.5}s latency</div></div>`;
   $("arb-hypo").innerHTML = `Hypothetical P&L if every survivor was taken with $${a.position_usd||50}: <b>$${(a.hypo_pnl||0).toFixed(2)}</b>`;
   // spread matrix
   let rows = [];

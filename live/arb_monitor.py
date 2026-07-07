@@ -46,7 +46,12 @@ EXCHANGES = {
 }
 SLIPPAGE = 0.0005                 # 0.05% per side
 POSITION_USD = 50.0
-EXEC_DELAY_S = 2.5                # simulated execution latency
+import os as _os
+# Simulated execution latency between spotting a gap and filling. 2.5s models a
+# retail trader; lower it (e.g. 0.5s) to model a faster/co-located setup. Note:
+# latency is NOT what kills these gaps — fees are (see the spread matrix: gaps
+# are net-negative BEFORE any delay). This mainly makes the test more complete.
+EXEC_DELAY_S = float(_os.getenv("ARB_DELAY_S", "0.5"))
 STALE_S = 10                      # feed older than this = degraded
 POLL_S = 2
 
