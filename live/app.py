@@ -26,6 +26,7 @@ from engine import ENGINE
 from claude_helper import ClaudeHelper
 from scanner import Scanner
 from arb_monitor import ArbMonitor
+from smart_grid import SmartGrid
 
 app = FastAPI(title="Real-Time Paper Trading Engine")
 
@@ -46,6 +47,11 @@ SCANNER = Scanner(ENGINE.broker, top_n=config.SCAN_TOP_N,
 # Cross-exchange arbitrage monitor (honest experiment, never real money).
 ARB = ArbMonitor(config.DATABASE_PATH) if config.ARB_ENABLED else None
 
+# Smart-grid: our most promising strategy (grids on ranging coins).
+GRID = SmartGrid(ENGINE.broker, scan_top=config.GRID_SCAN_TOP,
+                 grids=config.GRID_COUNT, per_grid=config.GRID_PER) \
+    if config.GRID_ENABLED else None
+
 
 @app.on_event("startup")
 def _start_engine():
@@ -57,6 +63,8 @@ def _start_engine():
         threading.Thread(target=SCANNER.run, daemon=True).start()
     if ARB:
         threading.Thread(target=ARB.run, daemon=True).start()
+    if GRID:
+        threading.Thread(target=GRID.run, daemon=True).start()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -102,6 +110,8 @@ def _enrich(snap):
         }
     if ARB:
         snap["arb"] = ARB.snapshot()
+    if GRID:
+        snap["grid"] = GRID.snapshot()
     return snap
 
 
