@@ -24,7 +24,8 @@ try:
 except Exception:  # noqa: BLE001
     pass
 
-STARTING_CAPITAL = float(os.getenv("STARTING_CAPITAL", "50"))
+# Paper capital per strategy (trend, forex). Part of the ~$1000 total budget.
+STARTING_CAPITAL = float(os.getenv("STARTING_CAPITAL", "100"))
 POSITION_SIZE_PCT = 0.95        # trend/forex sizing
 SCALP_POSITION_PCT = 0.30       # scalp sizing (smaller, more frequent)
 
@@ -122,7 +123,10 @@ ARB_ENABLED = os.getenv("ARB_ENABLED", "1") not in ("0", "false", "False")
 GRID_ENABLED = os.getenv("GRID_ENABLED", "1") not in ("0", "false", "False")
 GRID_SCAN_TOP = int(os.getenv("GRID_SCAN_TOP", "100"))
 GRID_COUNT = int(os.getenv("GRID_COUNT", "8"))     # more grids = more action
-GRID_PER = float(os.getenv("GRID_PER", "6"))
+# $50 per grid so each grid engine runs ~$400 (8 x $50). Big enough that %
+# moves show as visible dollars (a +0.2% bounce on $50 = $0.10, readable),
+# small enough to keep the whole system near the ~$1000 total budget.
+GRID_PER = float(os.getenv("GRID_PER", "50"))
 # How often to re-pick which coins get grids (rotate out coins that stopped
 # ranging, rotate in new qualifiers). NOTE: this is NOT how often grids trade —
 # grids trade every 15s (feed_prices). This only re-selects coins. 30min keeps
