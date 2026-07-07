@@ -110,5 +110,8 @@ SCAN_TOP_N = int(os.getenv("SCAN_TOP_N", "40"))       # markets to scan
 SCAN_SLOTS = int(os.getenv("SCAN_SLOTS", "5"))        # max held positions
 SCAN_TIMEFRAME = os.getenv("SCAN_TIMEFRAME", "15m")   # candle interval to score
 SCAN_SECONDS = int(os.getenv("SCAN_SECONDS", "300"))  # seconds between scans
+
+# Cross-exchange arbitrage monitor (honest experiment — observes only).
+ARB_ENABLED = os.getenv("ARB_ENABLED", "1") not in ("0", "false", "False")
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8000"))

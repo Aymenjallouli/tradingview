@@ -25,6 +25,7 @@ import config
 from engine import ENGINE
 from claude_helper import ClaudeHelper
 from scanner import Scanner
+from arb_monitor import ArbMonitor
 
 app = FastAPI(title="Real-Time Paper Trading Engine")
 
@@ -42,6 +43,9 @@ SCANNER = Scanner(ENGINE.broker, top_n=config.SCAN_TOP_N,
                   timeframe=config.SCAN_TIMEFRAME,
                   scan_seconds=config.SCAN_SECONDS) if SCAN_ON else None
 
+# Cross-exchange arbitrage monitor (honest experiment, never real money).
+ARB = ArbMonitor(config.DATABASE_PATH) if config.ARB_ENABLED else None
+
 
 @app.on_event("startup")
 def _start_engine():
@@ -51,6 +55,8 @@ def _start_engine():
     HELPER.start()
     if SCANNER:
         threading.Thread(target=SCANNER.run, daemon=True).start()
+    if ARB:
+        threading.Thread(target=ARB.run, daemon=True).start()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -94,6 +100,8 @@ def _enrich(snap):
             },
             **SCANNER.snapshot(),
         }
+    if ARB:
+        snap["arb"] = ARB.snapshot()
     return snap
 
 

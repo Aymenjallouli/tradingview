@@ -70,6 +70,21 @@
   .scan-table th,.scan-table td{text-align:left;padding:5px 8px;
     border-bottom:1px solid var(--line)}
   .scan-table th{color:var(--muted);font-weight:500;font-size:10px}
+  .arb-badge{display:inline-block;background:#3a1414;border:1px solid var(--red);
+    color:#ff9b95;font-size:11px;padding:3px 10px;border-radius:10px;
+    margin-bottom:14px}
+  .arb-funnel{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    font-size:13px;margin-bottom:6px}
+  .arb-step{background:var(--panel2);border:1px solid var(--line);
+    border-radius:8px;padding:8px 14px;text-align:center}
+  .arb-step .n{font-size:22px;font-weight:800}
+  .arb-step .l{font-size:10px;color:var(--muted);text-transform:uppercase}
+  .arb-arrow{color:var(--muted);font-size:18px}
+  .arb-hypo{font-size:13px;color:var(--muted)}
+  .arb-hypo b{color:var(--text)}
+  .arb-caveat{font-size:11px;color:var(--muted);font-style:italic;
+    margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}
+  .degraded{color:var(--red)}
 </style>
 </head>
 <body>
@@ -111,6 +126,29 @@
         </tr></thead><tbody id="scan-ranked"></tbody></table>
       </div>
     </div>
+  </div>
+
+  <!-- Arbitrage monitor -->
+  <h3>⚖️ Arb Monitor (experiment)</h3>
+  <div class="card" id="arb-card">
+    <div class="arb-badge">Guaranteed money detector — expect it to prove the opposite.</div>
+    <div class="arb-funnel" id="arb-funnel"></div>
+    <div class="arb-hypo" id="arb-hypo"></div>
+    <div class="scan-cols" style="margin-top:12px">
+      <div style="flex:1">
+        <div class="scan-sub">Live spread matrix (buy→sell, net % after costs)</div>
+        <table class="scan-table"><thead><tr>
+          <th>Symbol</th><th>Route</th><th>Gross</th><th>Net (after costs)</th>
+        </tr></thead><tbody id="arb-matrix"></tbody></table>
+      </div>
+    </div>
+    <div class="scan-sub" style="margin-top:12px">Last 10 opportunities & their fate</div>
+    <table class="scan-table"><thead><tr>
+      <th>Symbol</th><th>Route</th><th>Trigger net</th><th>Fill net</th><th>Fate</th><th>Lifetime</th>
+    </tr></thead><tbody id="arb-recent"></tbody></table>
+    <div class="arb-caveat">Assumes capital pre-parked on both exchanges;
+      real transfers take minutes. Fills use post-2.5s re-checked prices, bid/ask
+      only, costs on both sides. Observes only — never trades.</div>
   </div>
 
   <h3>Live activity (all strategies + scanner)</h3>
@@ -235,11 +273,43 @@ function renderScanner(sc){
     : `<tr><td colspan="4" class="empty">No strong signals right now (market flat/down).</td></tr>`;
 }
 
+function renderArb(a){
+  if(!a){ return; }
+  const f = a.funnel||{};
+  $("arb-funnel").innerHTML = `
+    <div class="arb-step"><div class="n">${f.raw_gaps||0}</div><div class="l">raw gaps seen</div></div>
+    <div class="arb-arrow">→</div>
+    <div class="arb-step"><div class="n">${f.net_positive||0}</div><div class="l">net-positive after costs</div></div>
+    <div class="arb-arrow">→</div>
+    <div class="arb-step"><div class="n" style="color:${f.survived>0?'var(--green)':'var(--red)'}">${f.survived||0}</div><div class="l">survived 2.5s latency</div></div>`;
+  $("arb-hypo").innerHTML = `Hypothetical P&L if every survivor was taken with $${a.position_usd||50}: <b>$${(a.hypo_pnl||0).toFixed(2)}</b>`;
+  // spread matrix
+  let rows = [];
+  for(const [sym, routes] of Object.entries(a.matrix||{})){
+    for(const [route, d] of Object.entries(routes)){
+      rows.push(`<tr><td>${sym}</td><td>${route.replace('->','→')}</td>
+        <td>${d.gross_pct}%</td>
+        <td style="color:${d.positive?'var(--green)':'var(--red)'}">${d.net_pct}%</td></tr>`);
+    }
+  }
+  $("arb-matrix").innerHTML = rows.join("") || `<tr><td colspan="4" class="empty">fetching…</td></tr>`;
+  // recent opportunities
+  $("arb-recent").innerHTML = (a.recent||[]).length
+    ? a.recent.map(r=>`<tr>
+        <td>${r.symbol}</td><td>${r.buy_ex}→${r.sell_ex}</td>
+        <td>${r.net_gap}%</td>
+        <td>${r.fill_net!=null?r.fill_net+'%':'—'}</td>
+        <td style="color:${r.outcome==='survived'?'var(--green)':'var(--red)'}">${r.outcome}</td>
+        <td>${r.lifetime_s}s</td></tr>`).join("")
+    : `<tr><td colspan="6" class="empty">No net-positive opportunities yet (that's the point).</td></tr>`;
+}
+
 // Render one snapshot (used by BOTH the SSE stream and the polling fallback).
 function applySnapshot(s){
   renderTicker(s.prices||{}, s.connected);
   renderCards(s.strategies||[]);
   renderScanner(s.scanner);
+  renderArb(s.arb);
   if(s.claude){
     $("claude-body").textContent = s.claude.text || "…";
     $("claude-at").textContent = s.claude.at

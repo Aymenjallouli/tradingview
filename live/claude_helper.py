@@ -81,6 +81,16 @@ class ClaudeHelper:
                               f"${t['pnl']:+.3f}")
         if recent:
             lines.append("Recent trades: " + "; ".join(recent[:8]))
+
+        # Arb-monitor funnel (if running) so Claude can reference it.
+        arb = snap.get("arb")
+        if arb:
+            f = arb["funnel"]
+            lines.append(
+                f"Arb monitor funnel: {f['raw_gaps']} raw gaps seen -> "
+                f"{f['net_positive']} net-positive after costs -> "
+                f"{f['survived']} survived 2.5s latency "
+                f"(hypothetical P&L ${arb['hypo_pnl']:.2f}).")
         return "\n".join(lines)
 
     def _call_claude(self, prompt):

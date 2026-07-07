@@ -14,6 +14,39 @@ helper**, built to run **24/7 on a VPS**.
 | **Scalp** | crypto 1m (Binance WS) | **tick-level** exits | ❌ lost (costs) — watch it |
 | **Forex** | USD/JPY 5m (yfinance) | ~60s refresh | ⚠️ mixed (best economics) |
 
+Plus experiments: a **market scanner** (scans 40 markets, paper-trades top
+signals), a **funding-rate arb backtester** (`funding_arb.py`), a **momentum
+backtester** (`momentum.py`), and the **Arb Monitor** below.
+
+## Arb Monitor (experiment) — the funnel
+
+`arb_monitor.py` measures whether cross-exchange arbitrage (Binance/Coinbase/
+Kraken, BTC & ETH) survives real costs and real latency. **Badge: "Guaranteed
+money detector — expect it to prove the opposite."** It observes only, never
+trades, and is brutally honest:
+
+- Uses **bid/ask** (real tradeable sides), never mid/last.
+- Applies **taker fees on both venues** (Binance 0.10%, Coinbase 0.60%,
+  Kraken 0.26%) + 0.05% slippage per side.
+- **Latency test:** on an opportunity it records the trigger, waits **2.5s**,
+  re-fetches, and fills at the **re-checked** prices — never the trigger prices.
+- Stale feed (>10s) → excluded and marked degraded.
+
+**The funnel it measures** (three numbers, shown as a funnel):
+
+```
+raw gaps seen  →  net-positive after costs  →  survived 2.5s latency
+  (constant)          (rare)                      (≈ zero)
+```
+
+**Prediction on record:** raw gaps are constant (arbitrage is real), net-positive
+after costs is rare, survived-latency is ≈ zero. If #3 stays near zero after a
+week, "guaranteed money" is answered with data. Live testing already shows raw
+gaps piling up while net-positive stays at 0 — the costs erase every gap. Tables:
+`arb_opportunities` (every trigger + fill + outcome), `arb_stats_daily`.
+Disable with `ARB_ENABLED=0`. Caveat: assumes capital pre-parked on both
+exchanges; real transfers take minutes.
+
 - **Real-time, no polling for crypto.** Reacts to Binance's live WebSocket.
   Scalp *exits* (stop/target) fire on **every tick** (sub-second), not once a
   minute. Forex has no free tick feed, so it refreshes ~every 60s.
