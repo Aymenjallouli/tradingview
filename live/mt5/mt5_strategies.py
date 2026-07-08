@@ -289,6 +289,41 @@ class RSI2:
         return []
 
 
+# ---------------------------------------------------------------------------
+# H) Donchian 1h (FAST) — the "more action" strategy. Same breakout edge as the
+#    4h Donchian but on a 1h clock: ~29 trades/symbol instead of a few/week.
+#    Backtested (cost-included): only profitable on TRENDING STOCKS, so it's
+#    hard-restricted to them. On forex/crypto/gold the fast clock loses to fees
+#    (median PF 0.73 overall — but GOOGL 3.04, AMD 2.69, INTC 2.40, META 1.41,
+#    AAPL 1.30). 15m was even faster and LOST everywhere (-75%) — rejected.
+# ---------------------------------------------------------------------------
+class DonchianFast:
+    key = "donch1h"
+    label = "Donchian 1h (fast, stocks only)"
+    timeframe = "1h"
+    direction = "long"
+    stop_pct = 0.03          # floor; real exit is the 10-bar low
+    target_pct = 0.10
+    # ONLY the stocks it won on in backtest. Do NOT widen without re-testing.
+    allowed_symbols = {"GOOGL", "AMD", "INTC", "META", "AAPL"}
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 40:
+            return []
+        hi, lo, cl = df["high"].values, df["low"].values, df["close"].values
+        i = len(df) - 1
+        if has_position:
+            if cl[i] < min(lo[i - 10:i]):
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "10-bar low exit (1h)"}]
+            return []
+        if cl[i] > max(hi[i - 20:i]):
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "1h 20-bar high breakout"}]
+        return []
+
+
 # Registry of ENABLED strategies, each restricted to where it has a real edge:
 #   Candle Lessons, Trend 4h — validated, all symbols
 #   Range Breakout — stocks+gold (backtest)
@@ -298,4 +333,4 @@ class RSI2:
 # Rejected: Bear Trend (PF 0.54), Bollinger MR (0.92), MACD (0.91).
 def build_strategies():
     return [CandleLessons(), Trend4h(), RangeBreakout(), MomentumPullback(),
-            DonchianBreakout(), RSI2()]
+            DonchianBreakout(), RSI2(), DonchianFast()]

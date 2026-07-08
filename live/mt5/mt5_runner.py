@@ -81,6 +81,7 @@ class MT5Runner:
              f"Signal strategies: {[s.key for s in self.orch.strategies]} + "
              f"momentum. Poll every {POLL_SECONDS}s.")
         self._running = True
+        poll_n = 0
         while self._running:
             try:
                 if not self.bridge.connected:
@@ -88,6 +89,15 @@ class MT5Runner:
                 self.orch.poll_once()
                 self._manage_trailing()
                 self.momentum.maybe_rebalance()   # rotates on its own schedule
+                # Heartbeat: prove the loop is alive even when no signal fires.
+                # Every 5th poll (~5 min) print open count + total P&L so the
+                # log never looks "frozen".
+                poll_n += 1
+                if poll_n % 5 == 1:
+                    pos = orders.open_positions()
+                    pnl = sum(p.profit for p in pos)
+                    _log(f"alive · poll #{poll_n} · {len(pos)} open positions · "
+                         f"open P&L ${pnl:+.2f} · scanning {len(self.bridge.symbols)} symbols")
             except Exception as exc:  # noqa: BLE001
                 _log(f"loop error: {exc}")
                 self.connected = self.bridge.connected
