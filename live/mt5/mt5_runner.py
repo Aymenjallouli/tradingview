@@ -19,7 +19,8 @@ import time
 from datetime import datetime, timezone
 
 from mt5_bridge import MT5Bridge
-from mt5_orchestrator import Orchestrator
+from mt5_orchestrator import Orchestrator, VIRTUAL_EQUITY
+from mt5_momentum import CrossMomentum
 import mt5_orders as orders
 
 try:
@@ -72,9 +73,13 @@ class MT5Runner:
             return
         self.connected = True
         self.orch = Orchestrator(self.bridge, dry_run=self.dry_run)
+        # Cross-sectional momentum runs alongside (rank+rotate on its schedule).
+        self.momentum = CrossMomentum(self.bridge,
+                                      virtual_equity=VIRTUAL_EQUITY or 1000,
+                                      dry_run=self.dry_run)
         _log(f"MT5 runner started ({'DRY-RUN' if self.dry_run else 'LIVE DEMO'}). "
-             f"Strategies: {[s.key for s in self.orch.strategies]}. "
-             f"Poll every {POLL_SECONDS}s.")
+             f"Signal strategies: {[s.key for s in self.orch.strategies]} + "
+             f"momentum. Poll every {POLL_SECONDS}s.")
         self._running = True
         while self._running:
             try:
@@ -82,6 +87,7 @@ class MT5Runner:
                     self.bridge.reconnect()
                 self.orch.poll_once()
                 self._manage_trailing()
+                self.momentum.maybe_rebalance()   # rotates on its own schedule
             except Exception as exc:  # noqa: BLE001
                 _log(f"loop error: {exc}")
                 self.connected = self.bridge.connected
@@ -98,6 +104,8 @@ class MT5Runner:
             return {"connected": False, "status": "starting"}
         st = self.orch.status()
         st["connected"] = self.bridge.connected
+        if getattr(self, "momentum", None):
+            st["momentum"] = self.momentum.snapshot()
         return st
 
 
