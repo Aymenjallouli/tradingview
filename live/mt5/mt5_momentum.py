@@ -37,7 +37,8 @@ def _log(m):
 
 
 # The assets that actually trend (momentum needs trends). Forex excluded.
-UNIVERSE = ["NVDA", "MSFT", "AMD", "INTC", "BTCUSD", "ETHUSD", "XAUUSD"]
+UNIVERSE = ["NVDA", "MSFT", "AMD", "INTC", "BTCUSD", "ETHUSD", "XAUUSD",
+            "AAPL", "AMZN", "GOOGL", "META", "NFLX", "XAGUSD"]
 LOOKBACK_DAYS = 60
 TOP_N = int(os.getenv("MOMO_TOP_N", "2"))
 REBALANCE_DAYS = int(os.getenv("MOMO_REBALANCE_DAYS", "20"))

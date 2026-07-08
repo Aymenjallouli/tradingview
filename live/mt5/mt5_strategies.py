@@ -153,7 +153,9 @@ class RangeBreakout:
     direction = "long"
     stop_pct = 0.03
     target_pct = 0.05
-    allowed_symbols = {"NVDA", "MSFT", "AMD", "INTC", "XAUUSD"}
+    # stocks + metals (breakout works on trending equities/metals, not forex)
+    allowed_symbols = {"NVDA", "MSFT", "AMD", "INTC", "XAUUSD",
+                       "XAGUSD", "AAPL", "GOOGL", "AMZN", "META"}
 
     def on_candle(self, symbol, df, has_position=False):
         if len(df) < 120 or has_position:
@@ -228,8 +230,11 @@ class DonchianBreakout:
     direction = "long"
     stop_pct = 0.05          # a floor; real exit is the 10-bar low
     target_pct = 0.30        # let winners run
+    # Original winners + new backtested winners (cost-included, PF>=1.2):
+    # XAGUSD 3.11, GOOGL 1.76, AMZN 1.63, AAPL 1.54, META 1.23.
     allowed_symbols = {"BTCUSD", "ETHUSD", "XAUUSD", "AMD", "NVDA",
-                       "MSFT", "INTC"}
+                       "MSFT", "INTC",
+                       "XAGUSD", "GOOGL", "AMZN", "AAPL", "META"}
 
     def on_candle(self, symbol, df, has_position=False):
         if len(df) < 60:
@@ -262,7 +267,8 @@ class RSI2:
     direction = "long"
     stop_pct = 0.05
     target_pct = 0.06
-    allowed_symbols = {"BTCUSD", "ETHUSD", "AMD", "NVDA", "MSFT"}
+    allowed_symbols = {"BTCUSD", "ETHUSD", "AMD", "NVDA", "MSFT",
+                       "AAPL", "GOOGL", "AMZN", "META"}
 
     def on_candle(self, symbol, df, has_position=False):
         if len(df) < 210:

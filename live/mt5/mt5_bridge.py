@@ -36,12 +36,18 @@ TRADE_MODE_REAL = 2
 # Only symbols the broker has ENABLED for trading are used (auto-checked); the
 # rest are skipped with a log line. Add/remove here as you enable symbols in
 # the MT5 Market Watch.
+#
+# Only LIQUID, tight-spread symbols are here. We deliberately EXCLUDE the
+# broker's illiquid alts (LTC/LINK/BCH/SOL, WTI) whose spreads (11-31%!) would
+# eat every trade — verified live, see chat. More assets only help when they're
+# clean; garbage symbols just bleed to the spread.
 SYMBOL_MAP = {
-    # crypto (synthetic prices on the MetaQuotes demo)
+    # crypto (synthetic prices on the MetaQuotes demo) — tight spread only
     "BTCUSD": ["BTCUSD", "BTC", "BTCUSD.", "BTCUSDT"],
     "ETHUSD": ["ETHUSD", "ETH", "ETHUSD.", "ETHUSDT"],
     # metals
     "XAUUSD": ["XAUUSD", "GOLD", "XAUUSD."],
+    "XAGUSD": ["XAGUSD", "SILVER", "XAGUSD."],
     # indices (usually disabled on MetaQuotes demo — kept in case enabled)
     "US100": ["US100", "USTEC", "NAS100", "NDX100", "USTECH"],
     "US500": ["US500", "SPX500", "US500.", "SPX"],
@@ -53,11 +59,23 @@ SYMBOL_MAP = {
     "USDCAD": ["USDCAD", "USDCAD."],
     "USDCHF": ["USDCHF", "USDCHF."],
     "NZDUSD": ["NZDUSD", "NZDUSD."],
+    # forex crosses (real prices, tight spread — more trend opportunities)
+    "EURJPY": ["EURJPY", "EURJPY."],
+    "GBPJPY": ["GBPJPY", "GBPJPY."],
+    "EURGBP": ["EURGBP", "EURGBP."],
+    "AUDJPY": ["AUDJPY", "AUDJPY."],
     # US stocks (real prices — great for the Candle Lessons trend strategy)
     "AMD": ["AMD", "AMD.NAS", "#AMD"],
     "NVDA": ["NVDA", "NVDA.NAS", "#NVDA"],
     "MSFT": ["MSFT", "MSFT.NAS", "#MSFT"],
     "INTC": ["INTC", "INTC.NAS", "#INTC"],
+    # mega-cap US stocks (real prices, tight spread — trend + momentum names)
+    "AAPL": ["AAPL", "AAPL.NAS", "#AAPL"],
+    "TSLA": ["TSLA", "TSLA.NAS", "#TSLA"],
+    "AMZN": ["AMZN", "AMZN.NAS", "#AMZN"],
+    "GOOGL": ["GOOGL", "GOOGL.NAS", "#GOOGL"],
+    "META": ["META", "META.NAS", "#META"],
+    "NFLX": ["NFLX", "NFLX.NAS", "#NFLX"],
 }
 
 # MT5 timeframe constants (guarded so the module imports without MT5 present).
