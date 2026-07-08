@@ -216,8 +216,80 @@ class MomentumPullback:
         return []
 
 
-# Registry of ENABLED strategies. C (Bear Trend) rejected in backtest.
-# D (Range Breakout) approved but symbol-restricted. E (Momentum) added after
-# its backtest (see mt5_backtest_fast).
+# ---------------------------------------------------------------------------
+# F) Donchian Breakout (Turtle) — the STRONGEST backtest: median PF 1.39,
+#    profitable on 9/14. Buy a 20-bar high breakout, exit on a 10-bar low.
+#    Rides big trends, cuts losers fast. Restricted to its winners.
+# ---------------------------------------------------------------------------
+class DonchianBreakout:
+    key = "donchian"
+    label = "Donchian Breakout (Turtle)"
+    timeframe = "4h"
+    direction = "long"
+    stop_pct = 0.05          # a floor; real exit is the 10-bar low
+    target_pct = 0.30        # let winners run
+    allowed_symbols = {"BTCUSD", "ETHUSD", "XAUUSD", "AMD", "NVDA",
+                       "MSFT", "INTC"}
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 60:
+            return []
+        hi, lo, cl = df["high"].values, df["low"].values, df["close"].values
+        i = len(df) - 1
+        if has_position:
+            # Exit when price closes below the 10-bar low.
+            if cl[i] < min(lo[i - 10:i]):
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "10-bar low exit"}]
+            return []
+        # Enter on a fresh 20-bar high breakout.
+        if cl[i] > max(hi[i - 20:i]):
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "20-bar high breakout"}]
+        return []
+
+
+# ---------------------------------------------------------------------------
+# G) RSI-2 (Connors) — mean reversion. PF 1.05 median (marginal), but strong on
+#    crypto + stocks. Buy RSI(2)<10 above the 200MA, sell RSI(2)>70.
+#    Restricted to the symbols it actually won on.
+# ---------------------------------------------------------------------------
+class RSI2:
+    key = "rsi2"
+    label = "RSI-2 mean reversion"
+    timeframe = "4h"
+    direction = "long"
+    stop_pct = 0.05
+    target_pct = 0.06
+    allowed_symbols = {"BTCUSD", "ETHUSD", "AMD", "NVDA", "MSFT"}
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 210:
+            return []
+        df = df.copy()
+        r = _rsi(df["close"], 2)
+        ma = _ema(df["close"], 200)
+        i = len(df) - 1
+        if has_position:
+            if r.iloc[i] > 70:
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "RSI-2 > 70"}]
+            return []
+        if df["close"].iloc[i] > ma.iloc[i] and r.iloc[i] < 10:
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "RSI-2 oversold above 200MA"}]
+        return []
+
+
+# Registry of ENABLED strategies, each restricted to where it has a real edge:
+#   Candle Lessons, Trend 4h — validated, all symbols
+#   Range Breakout — stocks+gold (backtest)
+#   Momentum Pullback — MSFT/USDCAD/ETH (its 3 winners)
+#   Donchian Breakout — STRONGEST (PF 1.39), 7 winning symbols
+#   RSI-2 — crypto+stocks (marginal but positive there)
+# Rejected: Bear Trend (PF 0.54), Bollinger MR (0.92), MACD (0.91).
 def build_strategies():
-    return [CandleLessons(), Trend4h(), RangeBreakout(), MomentumPullback()]
+    return [CandleLessons(), Trend4h(), RangeBreakout(), MomentumPullback(),
+            DonchianBreakout(), RSI2()]
