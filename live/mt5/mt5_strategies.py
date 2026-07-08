@@ -172,7 +172,52 @@ class RangeBreakout:
         return []
 
 
+# ---------------------------------------------------------------------------
+# E) Momentum Pullback — the FASTER one (1h). More action than the 4h/reversal
+#    strategies. Thesis: in a short-term uptrend, buy a shallow pullback to the
+#    20 EMA and ride the bounce. Not scalping — still trend-following, just on a
+#    faster clock. Backtest before trusting it.
+# ---------------------------------------------------------------------------
+class MomentumPullback:
+    key = "momo"
+    label = "Momentum Pullback (1h, faster)"
+    timeframe = "1h"
+    direction = "long"
+    stop_pct = 0.015         # -1.5%
+    target_pct = 0.03        # +3% (2:1)
+    # Restricted to the ONLY symbols it was profitable on in backtest:
+    # MSFT (PF 1.36), USDCAD (1.91), ETH (1.07). It LOST on the other 11.
+    allowed_symbols = {"MSFT", "USDCAD", "ETHUSD"}
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 60:
+            return []
+        df = df.copy()
+        df["ef"] = _ema(df["close"], 20)
+        df["es"] = _ema(df["close"], 50)
+        df["rsi"] = _rsi(df["close"], 14)
+        i = len(df) - 1
+        row, prev = df.iloc[i], df.iloc[i - 1]
+        if has_position:
+            # Exit if the short-term trend breaks (20 below 50).
+            if row["ef"] < row["es"]:
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "trend break"}]
+            return []
+        uptrend = row["ef"] > row["es"]
+        # Pullback: this bar dipped to/below the 20 EMA, prev was above it, and
+        # the close is back up (bounce), RSI not overbought.
+        pullback = (row["low"] <= row["ef"] and prev["close"] > prev["ef"]
+                    and row["close"] > row["ef"] and row["rsi"] < 65)
+        if uptrend and pullback:
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "pullback bounce in uptrend"}]
+        return []
+
+
 # Registry of ENABLED strategies. C (Bear Trend) rejected in backtest.
-# D (Range Breakout) approved but symbol-restricted (see allowed_symbols).
+# D (Range Breakout) approved but symbol-restricted. E (Momentum) added after
+# its backtest (see mt5_backtest_fast).
 def build_strategies():
-    return [CandleLessons(), Trend4h(), RangeBreakout()]
+    return [CandleLessons(), Trend4h(), RangeBreakout(), MomentumPullback()]

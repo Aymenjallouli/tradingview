@@ -34,10 +34,16 @@ def _log(m):
     print(f"[{ts}] [orch] {m}", flush=True)
 
 
-MAX_RISK_PCT = 1.5
-MAX_POSITIONS_TOTAL = 5
-MAX_POSITIONS_PER_STRATEGY = 3
-DAILY_DRAWDOWN_STOP = 0.05      # 5%
+import os
+MAX_RISK_PCT = float(os.getenv("MT5_RISK_PCT", "1.5"))
+# Size trades as if the account were this big, not the demo's $100k. Set to 1000
+# so the P&L mirrors what a real $1000 account would do. 0 = use real equity.
+VIRTUAL_EQUITY = float(os.getenv("MT5_VIRTUAL_EQUITY", "1000"))
+# Raised so the system grabs MORE opportunities when signals cluster in one
+# sweep. Still risk-governed: 10 x 1.5% = up to 15% account risk deployed.
+MAX_POSITIONS_TOTAL = int(os.getenv("MT5_MAX_POS", "10"))
+MAX_POSITIONS_PER_STRATEGY = int(os.getenv("MT5_MAX_POS_STRAT", "5"))
+DAILY_DRAWDOWN_STOP = float(os.getenv("MT5_DAILY_STOP", "0.05"))   # 5%
 
 
 class RiskGovernor:
@@ -157,8 +163,11 @@ class Orchestrator:
     def poll_once(self, symbols=None):
         """One pass: check breaker, run each strategy on its allowed symbols."""
         self.governor.check_breaker()
-        snap = self.bridge.account_snapshot()
-        equity = snap["equity"] if snap else 100000
+        # Size positions as if the account were VIRTUAL_EQUITY (e.g. $1000), so
+        # the risk/P&L mirror a realistic small account instead of the demo's
+        # $100k. The circuit breaker still watches the REAL demo equity.
+        equity = VIRTUAL_EQUITY if VIRTUAL_EQUITY > 0 else (
+            (self.bridge.account_snapshot() or {}).get("equity", 100000))
         universe = symbols or list(self.bridge.symbols.keys())
 
         for strat in self.strategies:
