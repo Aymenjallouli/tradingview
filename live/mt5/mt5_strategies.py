@@ -684,6 +684,53 @@ class GoldScalp15m:
         return []
 
 
+# ---------------------------------------------------------------------------
+# P) Metals Short 1h — profit when gold/silver FALL (fixes the long-only gap).
+#    Metals have a long-term UP drift, so shorting on 4h/daily LOSES (fights the
+#    bull — backtested PF 0.26-0.92). But on 1h you can catch the short-term
+#    DOWNSWINGS before the uptrend resumes. Backtested cost-included on 1h:
+#    gold ShortDonchian PF 1.78, silver ShortTrend 1.99, silver ShortDonchian
+#    1.54, gold ShortTrend 1.38. Two entries: 20-bar low breakdown (below
+#    200-EMA) OR 20/100 cross-down (below 200-EMA). Cover on a 10-bar high.
+# ---------------------------------------------------------------------------
+class MetalsShort1h:
+    key = "mshort"
+    label = "Metals Short 1h (down-moves)"
+    timeframe = "1h"
+    direction = "short"
+    stop_pct = 0.02
+    target_pct = 0.04
+    allowed_symbols = {"XAUUSD", "XAGUSD"}
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 210:
+            return []
+        df = df.copy()
+        et = _ema(df["close"], 200)
+        ef = _ema(df["close"], 20)
+        es = _ema(df["close"], 100)
+        hi, lo, cl = df["high"].values, df["low"].values, df["close"].values
+        i = len(df) - 1
+        if has_position:
+            # cover the short on a 10-bar high breakout
+            if cl[i] > max(hi[i - 10:i]):
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "10-bar high — cover short"}]
+            return []
+        below_200 = cl[i] < et.iloc[i]
+        if not below_200:
+            return []
+        # Entry A: 20-bar low breakdown
+        breakdown = cl[i] < min(lo[i - 20:i])
+        # Entry B: 20/100 cross down
+        cross_down = ef.iloc[i - 1] >= es.iloc[i - 1] and ef.iloc[i] < es.iloc[i]
+        if breakdown or cross_down:
+            return [{"type": "open", "side": "sell", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "1h metals breakdown (short)"}]
+        return []
+
+
 # Registry of ENABLED strategies, each restricted to where it has a real edge:
 #   Candle Lessons, Trend 4h — validated, all symbols
 #   Range Breakout — stocks+gold (backtest)
@@ -698,7 +745,7 @@ def build_strategies():
             DonchianBreakout(), RSI2(), DarvasBox(), DonchianFast(),
             MomentumBurst(), ShortBreakdown(),
             MetalsBollingerDaily(), MetalsTrendDaily(), MetalPulse(),
-            GoldScalp15m()]
+            GoldScalp15m(), MetalsShort1h()]
 
 
 # GOLD/SILVER FOCUS mode: when MT5_GOLD_FOCUS=1, trade ONLY the metals with the
@@ -720,6 +767,7 @@ def build_gold_focus_strategies():
         RSI2(),                  # mean reversion
         MetalPulse(),            # OUR 1h strategy — fast, lots of action
         GoldScalp15m(),          # 15m gold scalp — the fastest that survives
+        MetalsShort1h(),         # SHORT 1h — profit when metals fall
     ]
     # Force every strategy in focus mode to metals-only.
     for s in strategies:
