@@ -110,10 +110,12 @@ SYMBOL_MAP = {
 
 # MT5 timeframe constants (guarded so the module imports without MT5 present).
 if mt5 is not None:
-    TF = {"1h": mt5.TIMEFRAME_H1, "4h": mt5.TIMEFRAME_H4,
-          "1d": mt5.TIMEFRAME_D1}
+    TF = {"5m": mt5.TIMEFRAME_M5, "15m": mt5.TIMEFRAME_M15,
+          "30m": mt5.TIMEFRAME_M30, "1h": mt5.TIMEFRAME_H1,
+          "4h": mt5.TIMEFRAME_H4, "1d": mt5.TIMEFRAME_D1}
 else:
-    TF = {"1h": 16385, "4h": 16388, "1d": 16408}
+    TF = {"5m": 16389, "15m": 16391, "30m": 16392,
+          "1h": 16385, "4h": 16388, "1d": 16408}
 
 
 import mt5_log
