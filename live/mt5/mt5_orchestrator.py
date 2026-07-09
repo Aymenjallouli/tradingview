@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover
 
 import mt5_orders as orders
 import mt5_conviction as conviction
+import mt5_telegram as telegram
 from mt5_strategies import build_strategies, build_gold_focus_strategies
 
 
@@ -179,6 +180,11 @@ class Orchestrator:
             self._last_conf[f"{strat.key}|{our_symbol}"] = {
                 "confidence": conf, "label": conviction.label(conf),
                 "agree": agree, "risk_pct": risk_pct}
+            # Push the signal to the Telegram channel (no-op if not configured).
+            telegram.post_signal(our_symbol, getattr(strat, "label", strat.key),
+                                 intent["side"], res["price"], sl, tp,
+                                 confidence=conf, label=conviction.label(conf),
+                                 reason=intent.get("reason", ""))
             return True
         comment = (res.get("comment") or res.get("error") or "").lower()
         # "Market closed" / "no prices" are NOT transient — the market is shut
@@ -211,9 +217,13 @@ class Orchestrator:
             self._record(f"[DRY-RUN] [{strat.key}] WOULD CLOSE {our_symbol} "
                          f"({intent['reason']})")
             return
+        profit = pos.profit
         res = orders.close_position(pos)
         self._record(f"[{strat.key}] CLOSED {our_symbol} "
                      f"({intent['reason']}) ok={res['ok']}")
+        if res.get("ok"):
+            telegram.post_close(our_symbol, getattr(strat, "label", strat.key),
+                                profit, reason=intent.get("reason", ""))
 
     def _scan_set(self, strat_key, our_symbol, status, detail="", extra=None):
         """Record what one strategy saw on one symbol this poll (for the UI)."""
