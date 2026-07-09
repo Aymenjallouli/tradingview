@@ -17,6 +17,7 @@ Run standalone to verify the connection + a live tick/candle:
     python mt5_bridge.py
 """
 
+import os
 import time
 from datetime import datetime, timezone
 
@@ -64,6 +65,9 @@ SYMBOL_MAP = {
     "GBPJPY": ["GBPJPY", "GBPJPY."],
     "EURGBP": ["EURGBP", "EURGBP."],
     "AUDJPY": ["AUDJPY", "AUDJPY."],
+    # scandi USD pairs (verified tight spread on this demo: 0.007-0.011%)
+    "USDSEK": ["USDSEK", "USDSEK."],
+    "USDNOK": ["USDNOK", "USDNOK."],
     # US stocks (real prices — great for the Candle Lessons trend strategy)
     "AMD": ["AMD", "AMD.NAS", "#AMD"],
     "NVDA": ["NVDA", "NVDA.NAS", "#NVDA"],
@@ -158,7 +162,50 @@ class MT5Bridge:
                 break
             if our not in self.symbols:
                 _log(f"{our}: no tradeable broker symbol found")
-        _log(f"Universe resolved: {self.symbols}")
+        if os.getenv("MT5_AUTODISCOVER", "0") == "1":
+            self._autodiscover()
+        _log(f"Universe resolved ({len(self.symbols)} symbols): "
+             f"{sorted(self.symbols.keys())}")
+
+    def _autodiscover(self, max_spread_pct=0.25, min_bars=200):
+        """Broker-agnostic: scan the WHOLE broker symbol list and auto-add any
+        clean, liquid, fully-tradeable market we don't already have — oil,
+        indices, crypto, commodities, whatever THIS broker offers. Filters out
+        the junk (wide spreads, disabled, no history) so 'all markets' means
+        all *tradeable* markets, not garbage that bleeds to the spread.
+
+        Enable with env MT5_AUTODISCOVER=1. Off by default so the demo run stays
+        the curated 25; turn it on when you connect a broker with real depth."""
+        all_syms = mt5.symbols_get() or []
+        have = set(self.symbols.values())
+        added = 0
+        for s in all_syms:
+            name = s.name
+            if name in have:
+                continue
+            if s.trade_mode != 4:            # need FULL trading
+                continue
+            # Skip obvious junk name patterns (leveraged/inverse ETF variants).
+            up = name.upper()
+            if any(x in up for x in (".", "-P", "_", "#")):
+                continue
+            mt5.symbol_select(name, True)
+            tick = mt5.symbol_info_tick(name)
+            if not tick or tick.ask <= 0 or tick.bid <= 0:
+                continue
+            spread_pct = (tick.ask - tick.bid) / tick.ask * 100
+            if spread_pct > max_spread_pct:
+                continue
+            rates = mt5.copy_rates_from_pos(name, TF["4h"], 0, min_bars)
+            if rates is None or len(rates) < min_bars:
+                continue
+            self.symbols[name] = name        # our-name == broker-name here
+            added += 1
+            if added >= 60:                  # sane cap so we don't add 1000s
+                _log("autodiscover: hit 60-symbol cap, stopping")
+                break
+        _log(f"autodiscover: added {added} clean tradeable markets "
+             f"(spread < {max_spread_pct}%)")
 
     def reconnect(self):
         """Terminal restarts happen — try to re-establish the connection."""
