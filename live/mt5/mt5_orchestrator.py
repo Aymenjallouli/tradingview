@@ -137,24 +137,25 @@ class Orchestrator:
         if lots <= 0:
             self._record(f"[{strat.key}] {our_symbol}: skip — lot size 0 "
                          f"(risk/stop invalid)")
-            return
+            return True          # not a transient failure — don't hammer-retry
         allowed, reason = self.governor.can_open(strat.key)
         if not allowed:
             self._record(f"[{strat.key}] {our_symbol}: BLOCKED — {reason}")
-            return
+            return True          # governor block — wait for a new candle
         if self.dry_run:
             self._record(f"[DRY-RUN] [{strat.key}] WOULD {intent['side'].upper()} "
                          f"{our_symbol} {lots} lots @ {price:.5f} "
                          f"SL={sl:.5f} TP={tp:.5f} ({intent['reason']})")
-            return
+            return True
         res = orders.market_order(broker, intent["side"], lots, sl, tp,
                                   comment=f"{strat.key}")
         if res.get("ok"):
             self._record(f"[{strat.key}] OPENED {our_symbol} {lots} lots "
                          f"@ {res['price']} SL={sl:.5f} TP={tp:.5f}")
-        else:
-            self._record(f"[{strat.key}] OPEN FAILED {our_symbol}: "
-                         f"{res.get('comment') or res.get('error')}")
+            return True
+        self._record(f"[{strat.key}] OPEN FAILED {our_symbol}: "
+                     f"{res.get('comment') or res.get('error')}")
+        return False
 
     def _execute_close(self, strat, our_symbol, intent):
         pos = self._has_position(strat.key, our_symbol)
@@ -236,8 +237,13 @@ class Orchestrator:
                                            "signal (already acted this candle)",
                                            extra={"distance": dist})
                             continue
-                        self._last_bar[bar_key] = closed_time
-                        self._execute_open(strat, our_symbol, it, equity)
+                        # Only mark the candle as "acted" if the order actually
+                        # went through. A blocked/failed order (e.g. algo
+                        # trading off, requote) should retry on the next poll,
+                        # not be silently skipped until a new candle.
+                        acted = self._execute_open(strat, our_symbol, it, equity)
+                        if acted:
+                            self._last_bar[bar_key] = closed_time
                     elif it["type"] == "close":
                         self._execute_close(strat, our_symbol, it)
 
