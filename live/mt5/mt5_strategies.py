@@ -489,6 +489,80 @@ class ShortBreakdown:
         return []
 
 
+# ---------------------------------------------------------------------------
+# L) Gold/Silver Bollinger Reversal (DAILY) — the metals-focus specialist.
+#    On the DAILY chart, precious metals mean-revert beautifully: when price
+#    pierces below the lower Bollinger band then closes back inside, buy the
+#    snap-back; exit at the mean (20-SMA). Backtested cost-included:
+#    XAUUSD daily PF 3.26 (82% win), XAGUSD daily PF 53 (87% win!). Only metals,
+#    only daily — it does NOT work intraday or on other assets.
+# ---------------------------------------------------------------------------
+class MetalsBollingerDaily:
+    key = "goldbb"
+    label = "Metals Bollinger Reversal (daily)"
+    timeframe = "1d"
+    direction = "long"
+    stop_pct = 0.04
+    target_pct = 0.06
+    allowed_symbols = {"XAUUSD", "XAGUSD"}
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 25:
+            return []
+        c = df["close"]
+        mean = c.rolling(20).mean()
+        sd = c.rolling(20).std()
+        lower = mean - 2 * sd
+        i = len(df) - 1
+        if has_position:
+            # exit when price returns to (or above) the mean
+            if c.iloc[i] >= mean.iloc[i]:
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "reverted to mean"}]
+            return []
+        # prior bar closed below the lower band, this bar closes back inside
+        if (c.iloc[i - 1] < lower.iloc[i - 1]
+                and c.iloc[i] > lower.iloc[i]):
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "Bollinger snap-back (daily)"}]
+        return []
+
+
+# ---------------------------------------------------------------------------
+# M) Gold/Silver Trend (DAILY) — the long-hold metals trend rider. On the daily,
+#    the 20/100 EMA cross catches gold/silver's multi-week bull runs:
+#    XAUUSD daily Trend PF very high, XAGUSD daily PF 8.03 (+113%). Few trades,
+#    big moves. Metals + daily only.
+# ---------------------------------------------------------------------------
+class MetalsTrendDaily:
+    key = "goldtrend"
+    label = "Metals Trend (daily)"
+    timeframe = "1d"
+    direction = "long"
+    stop_pct = 0.06
+    target_pct = 0.25
+    allowed_symbols = {"XAUUSD", "XAGUSD"}
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 120:
+            return []
+        df = df.copy()
+        ef = _ema(df["close"], 20)
+        es = _ema(df["close"], 100)
+        i = len(df) - 1
+        if has_position:
+            if ef.iloc[i - 1] >= es.iloc[i - 1] and ef.iloc[i] < es.iloc[i]:
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "daily EMA cross down"}]
+            return []
+        if ef.iloc[i - 1] <= es.iloc[i - 1] and ef.iloc[i] > es.iloc[i]:
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "daily 20/100 cross up"}]
+        return []
+
+
 # Registry of ENABLED strategies, each restricted to where it has a real edge:
 #   Candle Lessons, Trend 4h — validated, all symbols
 #   Range Breakout — stocks+gold (backtest)
@@ -501,4 +575,30 @@ class ShortBreakdown:
 def build_strategies():
     return [CandleLessons(), Trend4h(), RangeBreakout(), MomentumPullback(),
             DonchianBreakout(), RSI2(), DarvasBox(), DonchianFast(),
-            MomentumBurst(), ShortBreakdown()]
+            MomentumBurst(), ShortBreakdown(),
+            MetalsBollingerDaily(), MetalsTrendDaily()]
+
+
+# GOLD/SILVER FOCUS mode: when MT5_GOLD_FOCUS=1, trade ONLY the metals with the
+# strategies that backtested strongest on them (a dedicated metals specialist).
+def build_gold_focus_strategies():
+    """The metals-only specialist team (all backtested on gold/silver):
+       Trend 4h (gold PF 5.24, silver 3.68), Donchian 4h (2.94 / 2.18),
+       Burst 4h (gold 2.07), Bollinger daily (gold 3.26 / silver 53),
+       Trend daily (silver 8.03), RSI-2 (daily-ish mean reversion).
+    Each is hard-restricted to XAUUSD/XAGUSD via allowed_symbols below."""
+    metals = {"XAUUSD", "XAGUSD"}
+    trend4h = Trend4h(); trend4h.allowed_symbols = metals
+    strategies = [
+        trend4h,                 # 4h trend — the champion on gold
+        DonchianBreakout(),      # already includes gold+silver
+        MomentumBurst(),         # gold only (silver burst was weak)
+        MetalsBollingerDaily(),  # daily mean reversion (82-87% win)
+        MetalsTrendDaily(),      # daily long-hold trend
+        RSI2(),                  # mean reversion
+    ]
+    # Force every strategy in focus mode to metals-only.
+    for s in strategies:
+        cur = getattr(s, "allowed_symbols", None)
+        s.allowed_symbols = metals if cur is None else (set(cur) & metals) or metals
+    return strategies

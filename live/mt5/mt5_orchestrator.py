@@ -27,7 +27,7 @@ except ImportError:  # pragma: no cover
 
 import mt5_orders as orders
 import mt5_conviction as conviction
-from mt5_strategies import build_strategies
+from mt5_strategies import build_strategies, build_gold_focus_strategies
 
 
 import mt5_log
@@ -100,7 +100,14 @@ class Orchestrator:
         self.bridge = bridge
         self.dry_run = dry_run
         self.governor = RiskGovernor(bridge)
-        self.strategies = build_strategies()
+        # GOLD/SILVER focus mode (MT5_GOLD_FOCUS=1): a dedicated metals
+        # specialist — only gold+silver, only the strategies that backtested
+        # strongest on them. Otherwise the full 42-market team.
+        if os.getenv("MT5_GOLD_FOCUS", "0") == "1":
+            self.strategies = build_gold_focus_strategies()
+            _log("*** GOLD/SILVER FOCUS MODE — metals only ***")
+        else:
+            self.strategies = build_strategies()
         # remember last candle time processed per (strategy, symbol) to act
         # once per closed candle.
         self._last_bar = {}
