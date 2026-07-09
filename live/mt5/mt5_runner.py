@@ -33,9 +33,11 @@ TRAIL_AFTER = 0.04         # start trailing after +4% in favor
 TRAIL_DISTANCE = 0.03      # trail 3% behind the best price
 
 
+import mt5_log
+
+
 def _log(m):
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}] [runner] {m}", flush=True)
+    mt5_log.emit("runner", m)
 
 
 class MT5Runner:

@@ -86,9 +86,11 @@ else:
     TF = {"1h": 16385, "4h": 16388, "1d": 16408}
 
 
+import mt5_log
+
+
 def _log(m):
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}] [mt5] {m}", flush=True)
+    mt5_log.emit("mt5", m)
 
 
 class MT5Bridge:

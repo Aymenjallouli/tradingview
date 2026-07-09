@@ -29,9 +29,11 @@ import mt5_orders as orders
 from mt5_strategies import build_strategies
 
 
+import mt5_log
+
+
 def _log(m):
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}] [orch] {m}", flush=True)
+    mt5_log.emit("orch", m)
 
 
 import os

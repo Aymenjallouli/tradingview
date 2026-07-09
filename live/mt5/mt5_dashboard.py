@@ -27,6 +27,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
 
+import mt5_log
 from mt5_runner import MT5Runner
 
 app = FastAPI(title="MT5 Bot Dashboard")
@@ -49,6 +50,9 @@ def api_state():
         return JSONResponse({"error": str(exc), "connected": False})
     snap["server_time"] = datetime.now(timezone.utc).isoformat()
     snap["dry_run"] = RUNNER.dry_run
+    # The FULL log stream (every module: order/orch/runner/mt5/momentum),
+    # not just the orchestrator's sparse event list.
+    snap["log"] = mt5_log.recent(200)
     return JSONResponse(snap)
 
 

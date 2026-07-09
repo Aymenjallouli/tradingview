@@ -18,9 +18,11 @@ except ImportError:  # pragma: no cover
     mt5 = None
 
 
+import mt5_log
+
+
 def _log(m):
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}] [order] {m}", flush=True)
+    mt5_log.emit("order", m)
 
 
 # Retcodes that mean "requote/price moved" — worth a retry.
