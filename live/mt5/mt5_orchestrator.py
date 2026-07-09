@@ -236,6 +236,13 @@ class Orchestrator:
 
     def poll_once(self, symbols=None):
         """One pass: check breaker, run each strategy on its allowed symbols."""
+        # Detect a STALE MT5 handle: the long-running process can lose its
+        # Python-API link even while the terminal stays connected (symptom:
+        # every candle pull returns empty -> dashboard shows "no-data"). If the
+        # account snapshot is gone, force a reconnect before scanning.
+        if self.bridge.account_snapshot() is None:
+            _log("account snapshot empty — MT5 handle looks stale, reconnecting")
+            self.bridge.reconnect()
         self.governor.check_breaker()
         self.poll_count += 1
         self.last_scan_time = datetime.now(timezone.utc).isoformat()

@@ -236,11 +236,19 @@ class MT5Bridge:
              f"(spread < {max_spread_pct}%)")
 
     def reconnect(self):
-        """Terminal restarts happen — try to re-establish the connection."""
+        """Terminal restarts / stale handles happen — re-establish the link.
+        Shut the old handle down first so a stale Python-API connection is
+        fully cleared before we re-initialize."""
         self.connected = False
+        if mt5 is not None:
+            try:
+                mt5.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
         for attempt in range(5):
             _log(f"reconnect attempt {attempt+1} ...")
             if self.connect():
+                _log("reconnected OK")
                 return True
             time.sleep(min(5 * (attempt + 1), 30))
         return False
