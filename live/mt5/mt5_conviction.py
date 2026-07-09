@@ -28,8 +28,12 @@ less behind the marginal ones. Still every trade has a broker SL/TP.
 
 import os
 
-RISK_MIN_PCT = float(os.getenv("MT5_RISK_MIN", "1.0"))
-RISK_MAX_PCT = float(os.getenv("MT5_RISK_MAX", "2.5"))
+# AGGRESSIVE sizing (user choice): weak setups risk 2%, strongest 5%.
+# On $1000 that's ~$20 (low conf) to ~$50 (very high conf) per trade — and a
+# high-conf 2:1 winner is ~$100. The flip side: a few high-conf losers in a row
+# can draw the account down 15-20%. Tune via env MT5_RISK_MIN / MT5_RISK_MAX.
+RISK_MIN_PCT = float(os.getenv("MT5_RISK_MIN", "2.0"))
+RISK_MAX_PCT = float(os.getenv("MT5_RISK_MAX", "5.0"))
 
 # Backtested profit factors (cost-included, from the chat's backtests). Used to
 # score how strong the EDGE is on each market. Best available PF across the

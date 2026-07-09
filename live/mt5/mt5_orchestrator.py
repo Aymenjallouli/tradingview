@@ -46,7 +46,11 @@ VIRTUAL_EQUITY = float(os.getenv("MT5_VIRTUAL_EQUITY", "1000"))
 # sweep. Still risk-governed: 10 x 1.5% = up to 15% account risk deployed.
 MAX_POSITIONS_TOTAL = int(os.getenv("MT5_MAX_POS", "10"))
 MAX_POSITIONS_PER_STRATEGY = int(os.getenv("MT5_MAX_POS_STRAT", "5"))
-DAILY_DRAWDOWN_STOP = float(os.getenv("MT5_DAILY_STOP", "0.05"))   # 5%
+# Widened to 12% to match the aggressive 2-5%/trade sizing (a 5%/trade loss
+# would trip a 5% daily stop instantly). Still a HARD backstop: lose 12% in a
+# day and all new entries stop until tomorrow — so you can't nuke the account
+# in one bad session. Open positions keep their broker SL/TP.
+DAILY_DRAWDOWN_STOP = float(os.getenv("MT5_DAILY_STOP", "0.12"))   # 12%
 
 
 class RiskGovernor:
