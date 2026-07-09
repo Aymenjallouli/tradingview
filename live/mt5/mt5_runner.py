@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from mt5_bridge import MT5Bridge
 from mt5_orchestrator import Orchestrator, VIRTUAL_EQUITY
 from mt5_momentum import CrossMomentum
+from mt5_pyramid import Pyramider
 import mt5_orders as orders
 
 try:
@@ -79,6 +80,9 @@ class MT5Runner:
         self.momentum = CrossMomentum(self.bridge,
                                       virtual_equity=VIRTUAL_EQUITY or 1000,
                                       dry_run=self.dry_run)
+        # Pyramiding: add to WINNERS (silver by default). Safe — capped, never
+        # adds to losers. No-op unless MT5_PYRAMID=1.
+        self.pyramider = Pyramider(self.bridge)
         _log(f"MT5 runner started ({'DRY-RUN' if self.dry_run else 'LIVE DEMO'}). "
              f"Signal strategies: {[s.key for s in self.orch.strategies]} + "
              f"momentum. Poll every {POLL_SECONDS}s.")
@@ -90,6 +94,8 @@ class MT5Runner:
                     self.bridge.reconnect()
                 self.orch.poll_once()
                 self._manage_trailing()
+                self.pyramider.manage()           # add to winners (if enabled)
+                self.pyramider.cleanup()
                 self.momentum.maybe_rebalance()   # rotates on its own schedule
                 # Heartbeat: prove the loop is alive even when no signal fires.
                 # Every 5th poll (~5 min) print open count + total P&L so the
