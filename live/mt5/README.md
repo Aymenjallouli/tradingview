@@ -54,21 +54,53 @@ the MetaQuotes demo and skipped automatically.
 
 ## Run it
 
+You have two ways to run — pick ONE (both run the bot; the dashboard just adds
+a live web UI on top). **Don't run both at once** — they'd double-trade.
+
+### Option A — Web dashboard (recommended: full visibility) ⭐
+
 ```bash
 cd live/mt5
-
-# Dry-run first (computes intents, sends NOTHING) — safe to watch:
-python mt5_runner.py --dry
-
-# Live demo trading (real orders on your demo):
-python mt5_runner.py
+python mt5_dashboard.py            # live demo trading + web UI
+python mt5_dashboard.py --dry      # dry-run (no orders) + web UI
 ```
 
-Leave it running in a terminal (or under pm2/NSSM as a Windows service). It polls
-every 60 seconds, fires strategies on new candle closes, manages trailing stops,
-and enforces the governor.
+Then open in your browser:
+- **This PC:**  http://localhost:8800
+- **Your phone (same wifi):**  http://<this-pc-LAN-ip>:8800
 
-**Stop:** Ctrl+C.
+The dashboard shows, refreshing every 3s:
+- account equity / balance / open P&L / position count
+- every open position (side, entry, SL, TP, live P&L, strategy)
+- **the full live scan** — every strategy × symbol, its status
+  (SIGNAL / holding / waiting) and how close breakout strategies are to firing
+- a **streaming activity log** of every signal, order, close, and heartbeat
+
+Port is 8800 (8000 collides with Docker/WSL on this machine). Override with
+`MT5_DASH_PORT=9000 python mt5_dashboard.py`.
+
+Phone can't connect? Allow the port through Windows Firewall (PowerShell as admin):
+```powershell
+New-NetFirewallRule -DisplayName "MT5 Dash" -Direction Inbound -LocalPort 8800 -Protocol TCP -Action Allow
+```
+
+### Option B — Terminal only (no web UI)
+
+```bash
+cd live/mt5
+python mt5_runner.py --dry         # dry-run
+python mt5_runner.py               # live demo
+```
+
+Both options poll every 60s, fire strategies on new candle closes, manage
+trailing stops, and enforce the risk governor. Every ~5 min a heartbeat line
+(`alive · poll #N · N positions · P&L`) proves the loop is alive.
+
+**Stop:** Ctrl+C (or kill the python process).
+
+> ⚠️ The bot only runs while this PC is awake. If the laptop sleeps, the bot
+> stops (open positions keep their broker SL/TP, but no new trades fire). For
+> true 24/7, run on a VPS / broker Virtual Hosting, or set the PC to never sleep.
 
 ---
 

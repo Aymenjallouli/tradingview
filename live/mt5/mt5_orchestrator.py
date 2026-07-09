@@ -98,6 +98,12 @@ class Orchestrator:
         # once per closed candle.
         self._last_bar = {}
         self.log = []              # recent human-readable events for the UI
+        # Full per-poll scan report so the dashboard can show the bot's live
+        # "thinking": every strategy x symbol, its status, and how close it is
+        # to a signal. Keyed by "strategy|symbol".
+        self.scan = {}
+        self.last_scan_time = None
+        self.poll_count = 0
 
     def _record(self, msg):
         _log(msg)
@@ -160,9 +166,20 @@ class Orchestrator:
         self._record(f"[{strat.key}] CLOSED {our_symbol} "
                      f"({intent['reason']}) ok={res['ok']}")
 
+    def _scan_set(self, strat_key, our_symbol, status, detail="", extra=None):
+        """Record what one strategy saw on one symbol this poll (for the UI)."""
+        entry = {"strategy": strat_key, "symbol": our_symbol,
+                 "status": status, "detail": detail,
+                 "time": datetime.now(timezone.utc).isoformat()}
+        if extra:
+            entry.update(extra)
+        self.scan[f"{strat_key}|{our_symbol}"] = entry
+
     def poll_once(self, symbols=None):
         """One pass: check breaker, run each strategy on its allowed symbols."""
         self.governor.check_breaker()
+        self.poll_count += 1
+        self.last_scan_time = datetime.now(timezone.utc).isoformat()
         # Size positions as if the account were VIRTUAL_EQUITY (e.g. $1000), so
         # the risk/P&L mirror a realistic small account instead of the demo's
         # $100k. The circuit breaker still watches the REAL demo equity.
@@ -178,10 +195,11 @@ class Orchestrator:
                     continue
                 df = self.bridge.candles(our_symbol, strat.timeframe, 300)
                 if df.empty:
+                    self._scan_set(strat.key, our_symbol, "no-data",
+                                   "no candles from broker")
                     continue
                 # Act once per newly CLOSED candle.
                 bar_key = (strat.key, our_symbol)
-                last_time = df["time"].iloc[-1]
                 # (the last row can be the forming candle; use the prior closed
                 #  one for signals, matching the paper engines)
                 closed = df.iloc[:-1]
@@ -191,29 +209,76 @@ class Orchestrator:
                 pos = self._has_position(strat.key, our_symbol)
                 intents = strat.on_candle(our_symbol, closed,
                                           has_position=pos is not None)
+                # --- Record the scan status for the dashboard ---
+                dist = self._breakout_distance(strat, closed)
+                if pos is not None:
+                    close_intent = next(
+                        (i for i in intents if i["type"] == "close"), None)
+                    self._scan_set(
+                        strat.key, our_symbol, "holding",
+                        "exit signal!" if close_intent else "in position",
+                        extra={"distance": dist})
+                elif any(i["type"] == "open" for i in intents):
+                    self._scan_set(strat.key, our_symbol, "SIGNAL",
+                                   "entry conditions met",
+                                   extra={"distance": dist})
+                else:
+                    self._scan_set(strat.key, our_symbol, "waiting",
+                                   "no signal", extra={"distance": dist})
                 # Only act on OPEN intents once per new closed candle; CLOSE
                 # intents can fire any poll (protective).
                 for it in intents:
                     if it["type"] == "open":
                         if self._last_bar.get(bar_key) == closed_time:
+                            self._scan_set(strat.key, our_symbol, "SIGNAL",
+                                           "signal (already acted this candle)",
+                                           extra={"distance": dist})
                             continue
                         self._last_bar[bar_key] = closed_time
                         self._execute_open(strat, our_symbol, it, equity)
                     elif it["type"] == "close":
                         self._execute_close(strat, our_symbol, it)
 
+    def _breakout_distance(self, strat, closed):
+        """For breakout-style strategies, how far (%) price is from firing.
+        Returns None for strategies where 'distance' isn't meaningful."""
+        try:
+            key = strat.key
+            cl = closed["close"].values
+            hi = closed["high"].values
+            price = cl[-1]
+            if key in ("donchian", "donch1h") and len(hi) >= 21:
+                band = hi[-21:-1].max()
+                return round((band - price) / price * 100, 2)
+            if key == "breakout" and len(hi) >= 21:
+                band = hi[-21:-1].max()
+                return round((band - price) / price * 100, 2)
+        except Exception:  # noqa: BLE001
+            return None
+        return None
+
     def status(self):
         snap = self.bridge.account_snapshot()
         ours = orders.open_positions()
+        # Sort the scan so signals + near-misses float to the top.
+        def _rank(s):
+            order = {"SIGNAL": 0, "holding": 1, "waiting": 2,
+                     "no-data": 3}.get(s.get("status"), 4)
+            d = s.get("distance")
+            return (order, d if d is not None else 999)
+        scan = sorted(self.scan.values(), key=_rank)
         return {
             "dry_run": self.dry_run,
             "account": snap,
             "breaker_blocked": self.governor.blocked,
+            "poll_count": self.poll_count,
+            "last_scan_time": self.last_scan_time,
             "open_positions": [{
                 "symbol": p.symbol, "type": "buy" if p.type == 0 else "sell",
                 "volume": p.volume, "price_open": p.price_open,
                 "sl": p.sl, "tp": p.tp, "profit": p.profit,
                 "strategy": p.comment} for p in ours],
             "strategies": [s.key for s in self.strategies],
-            "log": self.log[-30:][::-1],
+            "scan": scan,
+            "log": self.log[-60:][::-1],
         }
