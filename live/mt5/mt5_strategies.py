@@ -230,11 +230,15 @@ class DonchianBreakout:
     direction = "long"
     stop_pct = 0.05          # a floor; real exit is the 10-bar low
     target_pct = 0.30        # let winners run
-    # Original winners + new backtested winners (cost-included, PF>=1.2):
-    # XAGUSD 3.11, GOOGL 1.76, AMZN 1.63, AAPL 1.54, META 1.23.
+    # Original winners + stock winners + NEW Pepperstone winners (cost-incl):
+    # energy is the standout — BRENT 2.28, GASOLINE 2.26, NATGAS 2.14,
+    # CRUDE 1.71; plus JPN225 2.67, COFFEE 1.82, XPTUSD 1.34, UK100 1.38,
+    # SOYBEANS 1.38. Rejected: cocoa/sugar/corn/US500/GER40/BNB (all lose).
     allowed_symbols = {"BTCUSD", "ETHUSD", "XAUUSD", "AMD", "NVDA",
                        "MSFT", "INTC",
-                       "XAGUSD", "GOOGL", "AMZN", "AAPL", "META"}
+                       "XAGUSD", "GOOGL", "AMZN", "AAPL", "META",
+                       "CRUDE", "BRENT", "NATGAS", "GASOLINE", "XPTUSD",
+                       "COFFEE", "SOYBEANS", "UK100", "JPN225"}
 
     def on_candle(self, symbol, df, has_position=False):
         if len(df) < 60:

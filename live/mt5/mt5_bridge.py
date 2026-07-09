@@ -43,15 +43,37 @@ TRADE_MODE_REAL = 2
 # eat every trade — verified live, see chat. More assets only help when they're
 # clean; garbage symbols just bleed to the spread.
 SYMBOL_MAP = {
-    # crypto (synthetic prices on the MetaQuotes demo) — tight spread only
+    # crypto (Pepperstone has tight-spread BTC/ETH + BNB) — verified <0.12%
     "BTCUSD": ["BTCUSD", "BTC", "BTCUSD.", "BTCUSDT"],
     "ETHUSD": ["ETHUSD", "ETH", "ETHUSD.", "ETHUSDT"],
+    "BNBUSD": ["BNBUSD"],
     # metals
     "XAUUSD": ["XAUUSD", "GOLD", "XAUUSD."],
     "XAGUSD": ["XAGUSD", "SILVER", "XAGUSD."],
-    # indices (usually disabled on MetaQuotes demo — kept in case enabled)
-    "US100": ["US100", "USTEC", "NAS100", "NDX100", "USTECH"],
+    "XPTUSD": ["XPTUSD"],                       # platinum
+    # energy (Pepperstone: SpotCrude/SpotBrent/NatGas/Gasoline — tight spread!)
+    "CRUDE": ["SpotCrude", "XTIUSD", "WTI", "USOIL"],
+    "BRENT": ["SpotBrent", "XBRUSD", "UKOIL"],
+    "NATGAS": ["NatGas", "XNGUSD", "NGAS"],
+    "GASOLINE": ["Gasoline"],
+    # industrial metals
+    "COPPER": ["Copper", "XCUUSD"],
+    # agriculture (commodities — real markets)
+    "COFFEE": ["Coffee"],
+    "COCOA": ["Cocoa"],
+    "SUGAR": ["Sugar"],
+    "WHEAT": ["Wheat"],
+    "CORN": ["Corn"],
+    "SOYBEANS": ["Soybeans"],
+    # indices (Pepperstone: NAS100/US500/UK100/GER40/JPN225 — tight spread)
+    "US100": ["NAS100", "US100", "USTEC", "NDX100", "USTECH"],
     "US500": ["US500", "SPX500", "US500.", "SPX"],
+    "US30": ["US30", "DJ30", "WS30", "DOW"],
+    "UK100": ["UK100", "FTSE100"],
+    "GER40": ["GER40", "DE40", "GER30", "DAX40"],
+    "JPN225": ["JPN225", "JP225", "NIK225"],
+    "AUS200": ["AUS200", "ASX200"],
+    "FRA40": ["FRA40", "CAC40"],
     # forex majors (real prices)
     "EURUSD": ["EURUSD", "EURUSD."],
     "USDJPY": ["USDJPY", "USDJPY."],
@@ -65,9 +87,13 @@ SYMBOL_MAP = {
     "GBPJPY": ["GBPJPY", "GBPJPY."],
     "EURGBP": ["EURGBP", "EURGBP."],
     "AUDJPY": ["AUDJPY", "AUDJPY."],
-    # scandi USD pairs (verified tight spread on this demo: 0.007-0.011%)
+    # scandi + exotic USD pairs (Pepperstone: all tight spread, more trends)
     "USDSEK": ["USDSEK", "USDSEK."],
     "USDNOK": ["USDNOK", "USDNOK."],
+    "USDMXN": ["USDMXN"],
+    "USDZAR": ["USDZAR"],
+    "USDSGD": ["USDSGD"],
+    "USDCNH": ["USDCNH"],
     # US stocks (real prices — great for the Candle Lessons trend strategy)
     "AMD": ["AMD", "AMD.NAS", "#AMD"],
     "NVDA": ["NVDA", "NVDA.NAS", "#NVDA"],
