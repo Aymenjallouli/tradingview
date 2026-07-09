@@ -26,6 +26,7 @@ except ImportError:  # pragma: no cover
     mt5 = None
 
 import mt5_orders as orders
+import mt5_conviction as conviction
 from mt5_strategies import build_strategies
 
 
@@ -106,6 +107,8 @@ class Orchestrator:
         self.scan = {}
         self.last_scan_time = None
         self.poll_count = 0
+        self._agree_count = {}     # symbol -> #strategies signalling this poll
+        self._last_conf = {}       # "strat|symbol" -> confidence info of a fill
 
     def _record(self, msg):
         _log(msg)
@@ -133,7 +136,15 @@ class Orchestrator:
         else:
             sl = price * (1 + intent["stop_pct"])
             tp = price * (1 - intent["target_pct"])
-        lots = orders.lots_for_risk(broker, equity, MAX_RISK_PCT, price, sl)
+        # --- CONVICTION SIZING ---------------------------------------------
+        # Score this setup's confidence (strategy agreement + backtested edge +
+        # trend alignment), then size risk between RISK_MIN and RISK_MAX.
+        # NOT a guarantee — just more behind the higher-odds setups.
+        agree = getattr(self, "_agree_count", {}).get(our_symbol, 1)
+        trend_ok = self._trend_aligned(our_symbol, strat.timeframe)
+        conf = conviction.confidence(our_symbol, agree, trend_ok)
+        risk_pct = conviction.risk_pct_for(conf)
+        lots = orders.lots_for_risk(broker, equity, risk_pct, price, sl)
         if lots <= 0:
             self._record(f"[{strat.key}] {our_symbol}: skip — lot size 0 "
                          f"(risk/stop invalid)")
@@ -142,20 +153,36 @@ class Orchestrator:
         if not allowed:
             self._record(f"[{strat.key}] {our_symbol}: BLOCKED — {reason}")
             return True          # governor block — wait for a new candle
+        conf_txt = (f"conf {conf} ({conviction.label(conf)}, {agree} strat"
+                    f"{'s' if agree != 1 else ''} agree, risk {risk_pct}%)")
         if self.dry_run:
             self._record(f"[DRY-RUN] [{strat.key}] WOULD {intent['side'].upper()} "
                          f"{our_symbol} {lots} lots @ {price:.5f} "
-                         f"SL={sl:.5f} TP={tp:.5f} ({intent['reason']})")
+                         f"SL={sl:.5f} TP={tp:.5f} — {conf_txt}")
             return True
         res = orders.market_order(broker, intent["side"], lots, sl, tp,
                                   comment=f"{strat.key}")
         if res.get("ok"):
             self._record(f"[{strat.key}] OPENED {our_symbol} {lots} lots "
-                         f"@ {res['price']} SL={sl:.5f} TP={tp:.5f}")
+                         f"@ {res['price']} SL={sl:.5f} TP={tp:.5f} — {conf_txt}")
+            self._last_conf[f"{strat.key}|{our_symbol}"] = {
+                "confidence": conf, "label": conviction.label(conf),
+                "agree": agree, "risk_pct": risk_pct}
             return True
         self._record(f"[{strat.key}] OPEN FAILED {our_symbol}: "
                      f"{res.get('comment') or res.get('error')}")
         return False
+
+    def _trend_aligned(self, our_symbol, timeframe):
+        """True if price is above its 200-EMA on this timeframe (with-trend)."""
+        try:
+            df = self.bridge.candles(our_symbol, timeframe, 220)
+            if df.empty or len(df) < 200:
+                return False
+            ema200 = df["close"].ewm(span=200, adjust=False).mean().iloc[-1]
+            return bool(df["close"].iloc[-1] > ema200)
+        except Exception:  # noqa: BLE001
+            return False
 
     def _execute_close(self, strat, our_symbol, intent):
         pos = self._has_position(strat.key, our_symbol)
@@ -190,6 +217,30 @@ class Orchestrator:
             (self.bridge.account_snapshot() or {}).get("equity", 100000))
         universe = symbols or list(self.bridge.symbols.keys())
 
+        # --- First pass: count how many strategies signal each symbol this
+        #     poll, so conviction sizing can reward AGREEMENT. Cheap: reuses the
+        #     same candle pulls the main loop would do (cached by MT5).
+        self._agree_count = {}
+        for strat in self.strategies:
+            allowed = getattr(strat, "allowed_symbols", None)
+            for our_symbol in universe:
+                if allowed is not None and our_symbol not in allowed:
+                    continue
+                if self._has_position(strat.key, our_symbol):
+                    continue
+                df = self.bridge.candles(our_symbol, strat.timeframe, 300)
+                if df.empty or len(df) < 2:
+                    continue
+                closed = df.iloc[:-1]
+                try:
+                    intents = strat.on_candle(our_symbol, closed,
+                                              has_position=False)
+                except Exception:  # noqa: BLE001
+                    continue
+                if any(i["type"] == "open" for i in intents):
+                    self._agree_count[our_symbol] = \
+                        self._agree_count.get(our_symbol, 0) + 1
+
         for strat in self.strategies:
             # Respect a strategy's symbol whitelist (e.g. breakout = stocks+gold).
             allowed = getattr(strat, "allowed_symbols", None)
@@ -222,9 +273,13 @@ class Orchestrator:
                         "exit signal!" if close_intent else "in position",
                         extra={"distance": dist})
                 elif any(i["type"] == "open" for i in intents):
+                    agree = self._agree_count.get(our_symbol, 1)
+                    trend_ok = self._trend_aligned(our_symbol, strat.timeframe)
+                    conf = conviction.confidence(our_symbol, agree, trend_ok)
                     self._scan_set(strat.key, our_symbol, "SIGNAL",
-                                   "entry conditions met",
-                                   extra={"distance": dist})
+                                   f"entry! conf {conf} "
+                                   f"({conviction.label(conf)}, {agree} agree)",
+                                   extra={"distance": dist, "confidence": conf})
                 else:
                     self._scan_set(strat.key, our_symbol, "waiting",
                                    "no signal", extra={"distance": dist})
