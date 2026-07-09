@@ -294,6 +294,51 @@ class RSI2:
 
 
 # ---------------------------------------------------------------------------
+# I) Darvas Box (Nicolas Darvas, 1950s) — box breakout with box-trailing stop.
+#    A "box" = a consolidation range (top = recent high that holds, bottom =
+#    recent low). Buy on a close above the box top; stop = box bottom; as higher
+#    boxes form, trail the stop up box-by-box; exit on a close below the box.
+#    Backtested (cost-included) on 42 markets: wins on METALS + Nikkei + soft
+#    commodities, loses on forex/crypto (too choppy). Restricted to its winners:
+#    XAGUSD 2.39, JPN225 2.06, XAUUSD 1.71, NATGAS 1.51, AUDUSD 1.33,
+#    GASOLINE 1.30, COFFEE 1.27. Overlaps Donchian on some — which HELPS the
+#    conviction sizing (2 strategies agreeing = higher-confidence, bigger size).
+# ---------------------------------------------------------------------------
+class DarvasBox:
+    key = "darvas"
+    label = "Darvas Box (breakout + box-trail)"
+    timeframe = "4h"
+    direction = "long"
+    stop_pct = 0.05          # floor; the real stop is the box bottom
+    target_pct = 0.20        # let boxes stack; wide TP
+    box_len = 8
+    allowed_symbols = {"XAGUSD", "JPN225", "XAUUSD", "NATGAS", "AUDUSD",
+                       "GASOLINE", "COFFEE"}
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < self.box_len + 2:
+            return []
+        hi = df["high"].values
+        lo = df["low"].values
+        cl = df["close"].values
+        i = len(df) - 1
+        box_top = hi[i - self.box_len:i].max()
+        box_bottom = lo[i - self.box_len:i].min()
+        if has_position:
+            # Exit when price closes below the box bottom (the trailing stop).
+            if cl[i] < box_bottom:
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "closed below box bottom"}]
+            return []
+        # Enter on a close above the box top (breakout from consolidation).
+        if cl[i] > box_top:
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "breakout above Darvas box"}]
+        return []
+
+
+# ---------------------------------------------------------------------------
 # H) Donchian 1h (FAST) — the "more action" strategy. Same breakout edge as the
 #    4h Donchian but on a 1h clock: ~29 trades/symbol instead of a few/week.
 #    Backtested (cost-included): only profitable on TRENDING STOCKS, so it's
@@ -332,9 +377,11 @@ class DonchianFast:
 #   Candle Lessons, Trend 4h — validated, all symbols
 #   Range Breakout — stocks+gold (backtest)
 #   Momentum Pullback — MSFT/USDCAD/ETH (its 3 winners)
-#   Donchian Breakout — STRONGEST (PF 1.39), 7 winning symbols
+#   Donchian Breakout — STRONGEST (PF 1.39), + energy/index/metal winners
 #   RSI-2 — crypto+stocks (marginal but positive there)
+#   Darvas Box — metals + Nikkei + soft commodities (XAG 2.39, JPN225 2.06)
+#   Donchian 1h (fast) — trending stocks only
 # Rejected: Bear Trend (PF 0.54), Bollinger MR (0.92), MACD (0.91).
 def build_strategies():
     return [CandleLessons(), Trend4h(), RangeBreakout(), MomentumPullback(),
-            DonchianBreakout(), RSI2(), DonchianFast()]
+            DonchianBreakout(), RSI2(), DarvasBox(), DonchianFast()]
