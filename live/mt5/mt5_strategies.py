@@ -448,6 +448,47 @@ class MomentumBurst:
         return []
 
 
+# ---------------------------------------------------------------------------
+# K) Short Breakdown — the SHORT side (profit when price FALLS). The bot was
+#    long-only, blind to half of every market's moves. Backtested the short side
+#    (cost-included): shorting FAILS on indices/stocks (they drift UP over time
+#    — US500 PF 0.02, US100 0.08) but WORKS on things that crash hard with no
+#    upward bias: ETH (Donchian 2.97 / Trend 3.42), COCOA (1.97 / 7.23), BTC
+#    (1.40 / 2.37), silver, copper, USDMXN, coffee, GBPUSD. Restricted to those.
+#    Logic: SELL a 20-bar low breakdown while below the 200-EMA (with the
+#    downtrend); cover (close) on a 10-bar high.
+# ---------------------------------------------------------------------------
+class ShortBreakdown:
+    key = "short"
+    label = "Short Breakdown (down-moves)"
+    timeframe = "4h"
+    direction = "short"
+    stop_pct = 0.05          # floor; real exit is the 10-bar high
+    target_pct = 0.20        # let the fall run
+    allowed_symbols = {"ETHUSD", "BTCUSD", "COCOA", "XAGUSD", "COPPER",
+                       "USDMXN", "COFFEE", "GBPUSD"}
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 210:
+            return []
+        df = df.copy()
+        et = _ema(df["close"], 200)
+        hi, lo, cl = df["high"].values, df["low"].values, df["close"].values
+        i = len(df) - 1
+        if has_position:
+            # Cover (close the short) on a 10-bar high breakout.
+            if cl[i] > max(hi[i - 10:i]):
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "10-bar high — cover short"}]
+            return []
+        # Enter short on a 20-bar low breakdown while below the 200-EMA.
+        if cl[i] < min(lo[i - 20:i]) and cl[i] < et.iloc[i]:
+            return [{"type": "open", "side": "sell", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "20-bar low breakdown (short)"}]
+        return []
+
+
 # Registry of ENABLED strategies, each restricted to where it has a real edge:
 #   Candle Lessons, Trend 4h — validated, all symbols
 #   Range Breakout — stocks+gold (backtest)
@@ -460,4 +501,4 @@ class MomentumBurst:
 def build_strategies():
     return [CandleLessons(), Trend4h(), RangeBreakout(), MomentumPullback(),
             DonchianBreakout(), RSI2(), DarvasBox(), DonchianFast(),
-            MomentumBurst()]
+            MomentumBurst(), ShortBreakdown()]
