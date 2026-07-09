@@ -173,9 +173,17 @@ class Orchestrator:
                 "confidence": conf, "label": conviction.label(conf),
                 "agree": agree, "risk_pct": risk_pct}
             return True
+        comment = (res.get("comment") or res.get("error") or "").lower()
+        # "Market closed" / "no prices" are NOT transient — the market is shut
+        # for hours. Don't retry every 60s (log spam); treat as acted so we
+        # wait for a new candle, same as a normal signal.
+        non_transient = any(k in comment for k in
+                            ("market closed", "no prices", "market is closed",
+                             "trade disabled", "invalid stops"))
         self._record(f"[{strat.key}] OPEN FAILED {our_symbol}: "
-                     f"{res.get('comment') or res.get('error')}")
-        return False
+                     f"{res.get('comment') or res.get('error')}"
+                     f"{' (waiting — not retrying)' if non_transient else ''}")
+        return non_transient   # True => acted (won't hammer-retry a closed market)
 
     def _trend_aligned(self, our_symbol, timeframe):
         """True if price is above its 200-EMA on this timeframe (with-trend)."""
