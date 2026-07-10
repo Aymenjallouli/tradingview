@@ -800,6 +800,23 @@ def build_strategies():
 
 # GOLD/SILVER FOCUS mode: when MT5_GOLD_FOCUS=1, trade ONLY the metals with the
 # strategies that backtested strongest on them (a dedicated metals specialist).
+def build_daytrader_strategies():
+    """DAY-TRADER mode: ONLY the fast (15m/1h) metals strategies, for the
+    max-5-trades/day + stop-after-3-losses discipline. The slow 4h/daily
+    strategies are excluded so a day counts only fast trades. All metals-only."""
+    metals = {"XAUUSD", "XAGUSD"}
+    strategies = [
+        GoldScalp15m(),          # 15m gold momentum (the proven fast one)
+        MetalPulse(),            # 1h breakout + oversold bounce
+        MetalsRange(),           # 1h range mean-reversion (90% win backtest)
+        MetalsShort1h(),         # 1h shorts (down-moves)
+    ]
+    for s in strategies:
+        cur = getattr(s, "allowed_symbols", None)
+        s.allowed_symbols = metals if cur is None else (set(cur) & metals) or metals
+    return strategies
+
+
 def build_gold_focus_strategies():
     """The metals-only specialist team (all backtested on gold/silver):
        Trend 4h (gold PF 5.24, silver 3.68), Donchian 4h (2.94 / 2.18),

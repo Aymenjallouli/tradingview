@@ -28,7 +28,8 @@ except ImportError:  # pragma: no cover
 import mt5_orders as orders
 import mt5_conviction as conviction
 import mt5_telegram as telegram
-from mt5_strategies import build_strategies, build_gold_focus_strategies
+from mt5_strategies import (build_strategies, build_gold_focus_strategies,
+                            build_daytrader_strategies)
 
 
 import mt5_log
@@ -53,6 +54,14 @@ MAX_POSITIONS_PER_STRATEGY = int(os.getenv("MT5_MAX_POS_STRAT", "5"))
 # in one bad session. Open positions keep their broker SL/TP.
 DAILY_DRAWDOWN_STOP = float(os.getenv("MT5_DAILY_STOP", "0.12"))   # 12%
 
+# DAY-TRADER mode (MT5_DAYTRADER=1): fast strategies only, with a hard daily
+# discipline — max N new trades/day, and STOP for the day after M losses. This
+# is the classic anti-revenge-trade circuit breaker. Both counters reset each
+# UTC day. Defaults: 5 trades/day, stop after 3 losses.
+DAYTRADER = os.getenv("MT5_DAYTRADER", "0") == "1"
+MAX_TRADES_PER_DAY = int(os.getenv("MT5_MAX_TRADES_DAY", "5"))
+MAX_LOSSES_PER_DAY = int(os.getenv("MT5_MAX_LOSSES_DAY", "3"))
+
 
 class RiskGovernor:
     def __init__(self, bridge):
@@ -60,6 +69,10 @@ class RiskGovernor:
         self.day = None
         self.day_start_equity = None
         self.blocked = False       # circuit breaker tripped for the day
+        # Day-trader counters (reset each UTC day).
+        self.trades_today = 0
+        self.losses_today = 0
+        self.day_stopped = False   # hit the loss limit — stop for the day
 
     def _roll_day(self, equity):
         today = datetime.now(timezone.utc).date()
@@ -67,7 +80,26 @@ class RiskGovernor:
             self.day = today
             self.day_start_equity = equity
             self.blocked = False
-            _log(f"new day {today}: start equity ${equity:.2f}")
+            self.trades_today = 0
+            self.losses_today = 0
+            self.day_stopped = False
+            _log(f"new day {today}: start equity ${equity:.2f}"
+                 + (f" · day-trader: 0/{MAX_TRADES_PER_DAY} trades, "
+                    f"0/{MAX_LOSSES_PER_DAY} losses" if DAYTRADER else ""))
+
+    def record_trade_opened(self):
+        self.trades_today += 1
+
+    def record_trade_closed(self, profit):
+        """Called when a trade closes — count losses toward the daily limit."""
+        if profit < 0:
+            self.losses_today += 1
+            if DAYTRADER and self.losses_today >= MAX_LOSSES_PER_DAY \
+                    and not self.day_stopped:
+                self.day_stopped = True
+                _log(f"!!! DAY-TRADER STOP: {self.losses_today} losses today "
+                     f"(limit {MAX_LOSSES_PER_DAY}). No more trades until "
+                     f"tomorrow. Discipline > revenge trading.")
 
     def check_breaker(self):
         snap = self.bridge.account_snapshot()
@@ -85,7 +117,15 @@ class RiskGovernor:
     def can_open(self, strategy_key):
         """Return (allowed, reason)."""
         if self.blocked:
-            return False, "circuit breaker (daily -5%)"
+            return False, "circuit breaker (daily drawdown)"
+        # Day-trader discipline: stop after M losses, cap at N trades/day.
+        if DAYTRADER:
+            if self.day_stopped:
+                return False, (f"day-trader STOPPED "
+                               f"({self.losses_today} losses today)")
+            if self.trades_today >= MAX_TRADES_PER_DAY:
+                return False, (f"day-trader max {MAX_TRADES_PER_DAY} "
+                               f"trades/day reached")
         ours = orders.open_positions()
         if len(ours) >= MAX_POSITIONS_TOTAL:
             return False, f"max {MAX_POSITIONS_TOTAL} total positions"
@@ -101,10 +141,16 @@ class Orchestrator:
         self.bridge = bridge
         self.dry_run = dry_run
         self.governor = RiskGovernor(bridge)
-        # GOLD/SILVER focus mode (MT5_GOLD_FOCUS=1): a dedicated metals
-        # specialist — only gold+silver, only the strategies that backtested
-        # strongest on them. Otherwise the full 42-market team.
-        if os.getenv("MT5_GOLD_FOCUS", "0") == "1":
+        # Mode selection:
+        #  DAYTRADER  -> fast metals strategies + 5-trade/3-loss daily limit
+        #  GOLD_FOCUS -> all metals strategies (15m..daily)
+        #  else       -> the full 42-market team
+        if DAYTRADER:
+            self.strategies = build_daytrader_strategies()
+            _log(f"*** DAY-TRADER MODE — fast metals only · max "
+                 f"{MAX_TRADES_PER_DAY} trades/day · stop after "
+                 f"{MAX_LOSSES_PER_DAY} losses ***")
+        elif os.getenv("MT5_GOLD_FOCUS", "0") == "1":
             self.strategies = build_gold_focus_strategies()
             _log("*** GOLD/SILVER FOCUS MODE — metals only ***")
         else:
@@ -175,6 +221,7 @@ class Orchestrator:
         res = orders.market_order(broker, intent["side"], lots, sl, tp,
                                   comment=f"{strat.key}")
         if res.get("ok"):
+            self.governor.record_trade_opened()
             self._record(f"[{strat.key}] OPENED {our_symbol} {lots} lots "
                          f"@ {res['price']} SL={sl:.5f} TP={tp:.5f} — {conf_txt}")
             self._last_conf[f"{strat.key}|{our_symbol}"] = {
@@ -249,6 +296,30 @@ class Orchestrator:
             entry.update(extra)
         self.scan[f"{strat_key}|{our_symbol}"] = entry
 
+    def _count_closed_trades(self):
+        """Detect newly-closed OUR trades (bot-close OR broker SL/TP) and feed
+        their P&L to the governor so the day-trader loss limit counts every
+        loss, however it closed. Idempotent via a seen-deal set."""
+        if mt5 is None:
+            return
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        deals = mt5.history_deals_get(now - timedelta(hours=24), now)
+        if not deals:
+            return
+        if not hasattr(self, "_seen_deals"):
+            self._seen_deals = set()
+        for d in deals:
+            if d.magic != 770001 or d.entry != 1:   # our closing deals only
+                continue
+            if d.ticket in self._seen_deals:
+                continue
+            self._seen_deals.add(d.ticket)
+            self.governor.record_trade_closed(d.profit)
+        # keep the set from growing forever
+        if len(self._seen_deals) > 2000:
+            self._seen_deals = set(list(self._seen_deals)[-1000:])
+
     def poll_once(self, symbols=None):
         """One pass: check breaker, run each strategy on its allowed symbols."""
         # Detect a STALE MT5 handle: the long-running process can lose its
@@ -259,6 +330,7 @@ class Orchestrator:
             _log("account snapshot empty — MT5 handle looks stale, reconnecting")
             self.bridge.reconnect()
         self.governor.check_breaker()
+        self._count_closed_trades()   # feed closed P&L to day-trader limits
         self.poll_count += 1
         self.last_scan_time = datetime.now(timezone.utc).isoformat()
         # Size positions as if the account were VIRTUAL_EQUITY (e.g. $1000), so
@@ -387,6 +459,14 @@ class Orchestrator:
             "breaker_blocked": self.governor.blocked,
             "poll_count": self.poll_count,
             "last_scan_time": self.last_scan_time,
+            "daytrader": ({
+                "on": True,
+                "trades": self.governor.trades_today,
+                "max_trades": MAX_TRADES_PER_DAY,
+                "losses": self.governor.losses_today,
+                "max_losses": MAX_LOSSES_PER_DAY,
+                "stopped": self.governor.day_stopped,
+            } if DAYTRADER else {"on": False}),
             "open_positions": [{
                 "symbol": p.symbol, "type": "buy" if p.type == 0 else "sell",
                 "volume": p.volume, "price_open": p.price_open,
