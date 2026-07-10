@@ -34,23 +34,29 @@ def _env(**overrides):
 
 def main():
     procs = []
-    # Bot A — MAIN metals book (all strategies), magic 770001, port 8800
+    # Risk lowered 2-5% -> 1-2% after two bots double-lost ~$49 on one gold move.
+    # Different markets so they NEVER double-bet the same thing:
+    #   Bot A (MAIN)  = GOLD only
+    #   Bot B (DAY)   = SILVER only
     procs.append(subprocess.Popen(
         [PY, "-u", "mt5_dashboard.py", *DRY], cwd=HERE,
-        env=_env(MT5_GOLD_FOCUS="1", MT5_PYRAMID="1",
+        env=_env(MT5_GOLD_FOCUS="1", MT5_PYRAMID="0",
                  MT5_MAGIC="770001", MT5_DASH_PORT="8800",
-                 MT5_DAYTRADER="0")))
-    # Bot B — DAY-TRADER (fast only, 5/day, stop@3), magic 770002, port 8801
+                 MT5_DAYTRADER="0", MT5_ONLY_SYMBOLS="XAUUSD",
+                 MT5_RISK_MIN="1.0", MT5_RISK_MAX="2.0")))
     procs.append(subprocess.Popen(
         [PY, "-u", "mt5_dashboard.py", *DRY], cwd=HERE,
         env=_env(MT5_DAYTRADER="1", MT5_MAGIC="770002",
                  MT5_DASH_PORT="8801", MT5_GOLD_FOCUS="0",
-                 MT5_MAX_TRADES_DAY="5", MT5_MAX_LOSSES_DAY="3")))
+                 MT5_ONLY_SYMBOLS="XAGUSD",
+                 MT5_MAX_TRADES_DAY="5", MT5_MAX_LOSSES_DAY="3",
+                 MT5_RISK_MIN="1.0", MT5_RISK_MAX="2.0")))
 
     print("=" * 60)
-    print(" TWO BOTS RUNNING (isolated by magic number):")
-    print("   MAIN book   -> http://localhost:8800  (magic 770001)")
-    print("   DAY-TRADER  -> http://localhost:8801  (magic 770002)")
+    print(" TWO BOTS RUNNING (isolated: different markets + magic):")
+    print("   MAIN (GOLD)      -> http://localhost:8800  (magic 770001)")
+    print("   DAY-TRADER (SILVER) -> http://localhost:8801  (magic 770002)")
+    print("   Risk lowered to 1-2%/trade. No double-betting.")
     print("=" * 60)
     print(" Ctrl+C to stop both.")
 

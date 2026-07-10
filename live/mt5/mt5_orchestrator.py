@@ -62,6 +62,12 @@ DAYTRADER = os.getenv("MT5_DAYTRADER", "0") == "1"
 MAX_TRADES_PER_DAY = int(os.getenv("MT5_MAX_TRADES_DAY", "5"))
 MAX_LOSSES_PER_DAY = int(os.getenv("MT5_MAX_LOSSES_DAY", "3"))
 
+# Restrict a bot to specific symbols (so two bots on one account trade DIFFERENT
+# markets and never double-bet the same move). Comma list, e.g. "XAUUSD".
+# Empty = no restriction.
+ONLY_SYMBOLS = {s.strip() for s in os.getenv("MT5_ONLY_SYMBOLS", "").split(",")
+                if s.strip()}
+
 
 class RiskGovernor:
     def __init__(self, bridge):
@@ -339,6 +345,9 @@ class Orchestrator:
         equity = VIRTUAL_EQUITY if VIRTUAL_EQUITY > 0 else (
             (self.bridge.account_snapshot() or {}).get("equity", 100000))
         universe = symbols or list(self.bridge.symbols.keys())
+        # Restrict to this bot's assigned markets (two-bot isolation).
+        if ONLY_SYMBOLS:
+            universe = [u for u in universe if u in ONLY_SYMBOLS]
 
         # --- First pass: count how many strategies signal each symbol this
         #     poll, so conviction sizing can reward AGREEMENT. Cheap: reuses the
