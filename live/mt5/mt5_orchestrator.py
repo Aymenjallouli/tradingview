@@ -180,11 +180,15 @@ class Orchestrator:
             self._last_conf[f"{strat.key}|{our_symbol}"] = {
                 "confidence": conf, "label": conviction.label(conf),
                 "agree": agree, "risk_pct": risk_pct}
-            # Push the signal to the Telegram channel (no-op if not configured).
+            # Push the full signal to Telegram (no-op if not configured):
+            # entry/SL/TP, size in lots + $ risk, R:R, confidence, est. hold.
+            risk_usd = equity * (risk_pct / 100.0)
             telegram.post_signal(our_symbol, getattr(strat, "label", strat.key),
                                  intent["side"], res["price"], sl, tp,
                                  confidence=conf, label=conviction.label(conf),
-                                 reason=intent.get("reason", ""))
+                                 reason=intent.get("reason", ""),
+                                 lots=lots, risk_usd=risk_usd,
+                                 timeframe=getattr(strat, "timeframe", None))
             return True
         comment = (res.get("comment") or res.get("error") or "").lower()
         # "Market closed" / "no prices" are NOT transient — the market is shut

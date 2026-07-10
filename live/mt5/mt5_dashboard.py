@@ -20,6 +20,13 @@ import sys
 import threading
 from datetime import datetime, timezone
 
+# Load live/mt5/.env before anything reads config (Telegram, focus mode, etc.).
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except Exception:  # noqa: BLE001
+    pass
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn

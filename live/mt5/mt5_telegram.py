@@ -28,6 +28,14 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
 
+# Load live/mt5/.env so MT5_TG_TOKEN / MT5_TG_CHAT (and other config) are
+# available without exporting them by hand. Safe no-op if dotenv is missing.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except Exception:  # noqa: BLE001
+    pass
+
 TOKEN = os.getenv("MT5_TG_TOKEN", "").strip()
 CHAT = os.getenv("MT5_TG_CHAT", "").strip()
 DISCLAIMER = ("\n\n_Demo track record. Not financial advice. Trading is high"
@@ -57,21 +65,54 @@ def _send(text):
         return False
 
 
+# Rough "how long this trade tends to last" by the strategy's timeframe — an
+# ESTIMATE (trades exit on stop/target/signal, not a timer). Helps the reader
+# know the horizon: a 15m scalp is minutes-to-hours; a daily trade is days.
+_HOLD_ESTIMATE = {
+    "15m": "~1-6 hours", "30m": "~2-12 hours", "1h": "~4-24 hours",
+    "4h": "~1-4 days", "1d": "~1-3 weeks",
+}
+
+
+def _decimals(price):
+    return 5 if price < 10 else (3 if price < 1000 else 2)
+
+
 def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
-                label=None, reason=""):
-    """Post a new-entry signal."""
+                label=None, reason="", lots=None, risk_usd=None,
+                timeframe=None):
+    """Post a full new-entry signal: exact entry/SL/TP, position size (lots +
+    $ risk), reward:risk, confidence, and an estimated hold time."""
     emoji = "🟢" if side == "buy" else "🔴"
-    arrow = "LONG ▲" if side == "buy" else "SHORT ▼"
-    conf = ""
+    arrow = "LONG ▲ (buy)" if side == "buy" else "SHORT ▼ (sell)"
+    d = _decimals(price)
+    # reward:risk from the SL/TP distances
+    risk_dist = abs(price - sl)
+    rew_dist = abs(tp - price)
+    rr = (rew_dist / risk_dist) if risk_dist > 0 else 0
+    sl_pct = risk_dist / price * 100
+    tp_pct = rew_dist / price * 100
+
+    lines = [f"{emoji} *SIGNAL — {symbol}*  {arrow}",
+             f"*Strategy:* {strategy}"]
     if confidence is not None:
-        conf = f"\n*Confidence:* {label or ''} ({confidence})"
-    txt = (f"{emoji} *SIGNAL — {symbol}*  {arrow}\n"
-           f"*Strategy:* {strategy}{conf}\n"
-           f"*Entry:* `{price}`\n"
-           f"*Stop:* `{round(sl,5)}`   *Target:* `{round(tp,5)}`\n"
-           f"_{reason}_"
-           f"{DISCLAIMER}")
-    return _send(txt)
+        lines.append(f"*Confidence:* {label or ''} ({confidence}/100)")
+    lines.append("")
+    lines.append(f"📍 *Entry:* `{price:.{d}f}`")
+    lines.append(f"🛑 *Stop-loss:* `{sl:.{d}f}`  (−{sl_pct:.2f}%)")
+    lines.append(f"🎯 *Take-profit:* `{tp:.{d}f}`  (+{tp_pct:.2f}%)")
+    lines.append(f"⚖️ *Reward:Risk:* {rr:.1f} : 1")
+    if lots is not None:
+        size = f"💰 *Size:* {lots} lots"
+        if risk_usd is not None:
+            size += f"  (risking ~${abs(risk_usd):.0f} if stop hit)"
+        lines.append(size)
+    if timeframe:
+        est = _HOLD_ESTIMATE.get(timeframe, "varies")
+        lines.append(f"⏱️ *Est. hold:* {est}  ({timeframe} strategy)")
+    lines.append(f"\n_Why:_ {reason}")
+    lines.append(DISCLAIMER)
+    return _send("\n".join(lines))
 
 
 def post_close(symbol, strategy, profit, reason=""):
