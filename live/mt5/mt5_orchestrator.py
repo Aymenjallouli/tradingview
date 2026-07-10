@@ -310,7 +310,7 @@ class Orchestrator:
         if not hasattr(self, "_seen_deals"):
             self._seen_deals = set()
         for d in deals:
-            if d.magic != 770001 or d.entry != 1:   # our closing deals only
+            if d.magic != orders.MAGIC or d.entry != 1:  # our closing deals
                 continue
             if d.ticket in self._seen_deals:
                 continue

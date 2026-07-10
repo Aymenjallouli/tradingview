@@ -9,6 +9,7 @@ a risk % of account, position close, and stop-modify (for trailing stops).
 DEMO ONLY — this module assumes the bridge already verified a demo account.
 """
 
+import os
 import time
 from datetime import datetime, timezone
 
@@ -19,6 +20,12 @@ except ImportError:  # pragma: no cover
 
 
 import mt5_log
+
+# Each bot instance tags its trades with its OWN magic number so multiple bots
+# (e.g. a slow "main" book and a fast "day-trader" book) can run side by side
+# on the same account without seeing/managing each other's positions.
+# Set MT5_MAGIC per bot (default 770001 = the main book).
+MAGIC = int(os.getenv("MT5_MAGIC", "770001"))
 
 
 def _log(m):
@@ -97,7 +104,7 @@ def market_order(broker_symbol, side, lots, sl_price, tp_price,
             "sl": float(sl_price),
             "tp": float(tp_price),
             "deviation": deviation,
-            "magic": 770001,           # tags our orders
+            "magic": MAGIC,            # tags this bot's orders
             "comment": comment[:31],
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": _filling_mode(broker_symbol),
@@ -147,7 +154,7 @@ def close_position(position, deviation=20):
         "action": mt5.TRADE_ACTION_DEAL, "symbol": position.symbol,
         "volume": position.volume, "type": order_type,
         "position": position.ticket, "price": price, "deviation": deviation,
-        "magic": 770001, "comment": "close",
+        "magic": MAGIC, "comment": "close",
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": _filling_mode(position.symbol),
     }
@@ -172,9 +179,10 @@ def modify_stop(position, new_sl, new_tp=None):
     return {"ok": ok}
 
 
-def open_positions(magic=770001):
-    """Our open positions (filtered by magic number)."""
+def open_positions(magic=None):
+    """This bot's open positions (filtered by its magic number)."""
     poss = mt5.positions_get()
     if poss is None:
         return []
-    return [p for p in poss if p.magic == magic]
+    m = MAGIC if magic is None else magic
+    return [p for p in poss if p.magic == m]
