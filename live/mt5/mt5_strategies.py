@@ -781,64 +781,69 @@ class MetalsRange:
         return []
 
 
-# Registry of ENABLED strategies, each restricted to where it has a real edge:
-#   Candle Lessons, Trend 4h — validated, all symbols
-#   Range Breakout — stocks+gold (backtest)
-#   Momentum Pullback — MSFT/USDCAD/ETH (its 3 winners)
-#   Donchian Breakout — STRONGEST (PF 1.39), + energy/index/metal winners
-#   RSI-2 — crypto+stocks (marginal but positive there)
-#   Darvas Box — metals + Nikkei + soft commodities (XAG 2.39, JPN225 2.06)
-#   Donchian 1h (fast) — trending stocks only
-# Rejected: Bear Trend (PF 0.54), Bollinger MR (0.92), MACD (0.91).
-def build_strategies():
-    return [CandleLessons(), Trend4h(), RangeBreakout(), MomentumPullback(),
-            DonchianBreakout(), RSI2(), DarvasBox(), DonchianFast(),
-            MomentumBurst(), ShortBreakdown(),
-            MetalsBollingerDaily(), MetalsTrendDaily(), MetalPulse(),
-            GoldScalp15m(), MetalsShort1h(), MetalsRange()]
+# ===========================================================================
+# THREE CLEAN BOOKS — each with ONLY its backtest-winning strategies (fresh
+# rebuild, cost-included PFs shown). Rejected losers are excluded.
+# ===========================================================================
 
-
-# GOLD/SILVER FOCUS mode: when MT5_GOLD_FOCUS=1, trade ONLY the metals with the
-# strategies that backtested strongest on them (a dedicated metals specialist).
-def build_daytrader_strategies():
-    """DAY-TRADER mode: ONLY the fast (15m/1h) metals strategies, for the
-    max-5-trades/day + stop-after-3-losses discipline. The slow 4h/daily
-    strategies are excluded so a day counts only fast trades. All metals-only."""
-    metals = {"XAUUSD", "XAGUSD"}
-    strategies = [
-        GoldScalp15m(),          # 15m gold momentum (the proven fast one)
-        MetalPulse(),            # 1h breakout + oversold bounce
-        MetalsRange(),           # 1h range mean-reversion (90% win backtest)
-        MetalsShort1h(),         # 1h shorts (down-moves)
-    ]
+def _restrict(strategies, symbols):
+    """Hard-restrict every strategy to the given symbol set."""
     for s in strategies:
         cur = getattr(s, "allowed_symbols", None)
-        s.allowed_symbols = metals if cur is None else (set(cur) & metals) or metals
+        s.allowed_symbols = symbols if cur is None else (set(cur) & symbols) or symbols
     return strategies
+
+
+def build_book_metals():
+    """BOOK 1 — LONG-TERM METALS (gold + silver), slow trend/breakout.
+    Winners (backtested PF): gold trend 1d 6.77, trend 4h 5.35, donchian 4h
+    3.05, burst 4h 2.15, donchian 1d 1.95; silver trend 4h 3.64, trend 1d 2.18,
+    donchian 4h 2.14. All long-term — rides the big metal moves."""
+    trend4h = Trend4h()
+    trenddaily = MetalsTrendDaily()          # 20/100 cross on the daily
+    strategies = [
+        trend4h,                 # 4h trend (gold 5.35 / silver 3.64)
+        trenddaily,              # daily trend (gold 6.77 / silver 2.18)
+        DonchianBreakout(),      # 4h + 1d breakout (gold 3.05 / silver 2.14)
+        MomentumBurst(),         # 4h burst (gold 2.15; silver weak -> gold only)
+        MetalsBollingerDaily(),  # daily mean-reversion floor (high win rate)
+    ]
+    return _restrict(strategies, {"XAUUSD", "XAGUSD"})
+
+
+def build_book_shortterm():
+    """BOOK 2 — SHORT-TERM (fast 15m/1h metals). Winners: gold range 1h 4.08
+    (90% win!), gold pulse 1h 1.40, gold scalp 15m 1.43, silver pulse 1h 1.46.
+    Plus 1h shorts for down-moves. Fast = more action, disciplined."""
+    strategies = [
+        MetalsRange(),           # 1h range (gold PF 4.08, 90% win)
+        MetalPulse(),            # 1h breakout+bounce (gold 1.40 / silver 1.46)
+        GoldScalp15m(),          # 15m gold momentum (1.43) — gold only
+        MetalsShort1h(),         # 1h shorts (down-moves)
+    ]
+    return _restrict(strategies, {"XAUUSD", "XAGUSD"})
+
+
+def build_book_crypto():
+    """BOOK 3 — CRYPTO (BTC + ETH), 4h. Winners: ETH trend 4h 1.81, ETH burst
+    4h 1.55, BTC burst 4h 1.40, BTC rsi2 4h 1.31. Rejected: BTC trend, ETH
+    donchian/rsi2/pulse (losers). Crypto is volatile — momentum + burst fit."""
+    crypto = {"BTCUSD", "ETHUSD"}
+    trend4h = Trend4h()          # ETH trend 1.81
+    burst = MomentumBurst()
+    rsi2 = RSI2()                # BTC rsi2 1.31
+    strategies = [trend4h, burst, rsi2]
+    return _restrict(strategies, crypto)
+
+
+# ---- back-compat aliases (older launchers/env may still call these) ----
+def build_strategies():
+    return build_book_metals() + build_book_shortterm() + build_book_crypto()
+
+
+def build_daytrader_strategies():
+    return build_book_shortterm()
 
 
 def build_gold_focus_strategies():
-    """The metals-only specialist team (all backtested on gold/silver):
-       Trend 4h (gold PF 5.24, silver 3.68), Donchian 4h (2.94 / 2.18),
-       Burst 4h (gold 2.07), Bollinger daily (gold 3.26 / silver 53),
-       Trend daily (silver 8.03), RSI-2 (daily-ish mean reversion).
-    Each is hard-restricted to XAUUSD/XAGUSD via allowed_symbols below."""
-    metals = {"XAUUSD", "XAGUSD"}
-    trend4h = Trend4h(); trend4h.allowed_symbols = metals
-    strategies = [
-        trend4h,                 # 4h trend — the champion on gold
-        DonchianBreakout(),      # already includes gold+silver
-        MomentumBurst(),         # gold only (silver burst was weak)
-        MetalsBollingerDaily(),  # daily mean reversion (82-87% win)
-        MetalsTrendDaily(),      # daily long-hold trend
-        RSI2(),                  # mean reversion
-        MetalPulse(),            # OUR 1h strategy — fast, lots of action
-        GoldScalp15m(),          # 15m gold scalp — the fastest that survives
-        MetalsShort1h(),         # SHORT 1h — profit when metals fall
-        MetalsRange(),           # RANGE — fires when chopping sideways (now!)
-    ]
-    # Force every strategy in focus mode to metals-only.
-    for s in strategies:
-        cur = getattr(s, "allowed_symbols", None)
-        s.allowed_symbols = metals if cur is None else (set(cur) & metals) or metals
-    return strategies
+    return build_book_metals()

@@ -29,7 +29,8 @@ import mt5_orders as orders
 import mt5_conviction as conviction
 import mt5_telegram as telegram
 from mt5_strategies import (build_strategies, build_gold_focus_strategies,
-                            build_daytrader_strategies)
+                            build_daytrader_strategies, build_book_metals,
+                            build_book_shortterm, build_book_crypto)
 
 
 import mt5_log
@@ -147,15 +148,26 @@ class Orchestrator:
         self.bridge = bridge
         self.dry_run = dry_run
         self.governor = RiskGovernor(bridge)
-        # Mode selection:
-        #  DAYTRADER  -> fast metals strategies + 5-trade/3-loss daily limit
-        #  GOLD_FOCUS -> all metals strategies (15m..daily)
-        #  else       -> the full 42-market team
-        if DAYTRADER:
+        # Book selection via MT5_BOOK (the clean 3-book architecture):
+        #   "metals"    -> long-term gold/silver trend & breakout
+        #   "shortterm" -> fast 15m/1h metals (+ day-trader limits if DAYTRADER)
+        #   "crypto"    -> BTC/ETH momentum
+        # Falls back to legacy modes if MT5_BOOK is unset.
+        book = os.getenv("MT5_BOOK", "").lower()
+        if book == "metals":
+            self.strategies = build_book_metals()
+            _log("*** BOOK 1 — LONG-TERM METALS (gold/silver) ***")
+        elif book == "shortterm":
+            self.strategies = build_book_shortterm()
+            _log("*** BOOK 2 — SHORT-TERM (fast metals) ***")
+        elif book == "crypto":
+            self.strategies = build_book_crypto()
+            _log("*** BOOK 3 — CRYPTO (BTC/ETH) ***")
+        elif DAYTRADER:
             self.strategies = build_daytrader_strategies()
-            _log(f"*** DAY-TRADER MODE — fast metals only · max "
-                 f"{MAX_TRADES_PER_DAY} trades/day · stop after "
-                 f"{MAX_LOSSES_PER_DAY} losses ***")
+            _log(f"*** DAY-TRADER MODE — fast metals · max "
+                 f"{MAX_TRADES_PER_DAY} trades/day · stop@{MAX_LOSSES_PER_DAY} "
+                 f"losses ***")
         elif os.getenv("MT5_GOLD_FOCUS", "0") == "1":
             self.strategies = build_gold_focus_strategies()
             _log("*** GOLD/SILVER FOCUS MODE — metals only ***")
