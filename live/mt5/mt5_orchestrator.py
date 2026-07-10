@@ -181,14 +181,23 @@ class Orchestrator:
                 "confidence": conf, "label": conviction.label(conf),
                 "agree": agree, "risk_pct": risk_pct}
             # Push the full signal to Telegram (no-op if not configured):
-            # entry/SL/TP, size in lots + $ risk, R:R, confidence, est. hold.
+            # entry/SL/TP, size (lots + $ value), $ profit if TP / loss if SL,
+            # resulting balance, R:R, confidence, est. hold.
             risk_usd = equity * (risk_pct / 100.0)
+            notional_usd = None
+            if mt5 is not None:
+                info = mt5.symbol_info(broker)
+                if info and info.trade_contract_size:
+                    notional_usd = lots * info.trade_contract_size * res["price"]
+            snap = self.bridge.account_snapshot() or {}
+            balance = snap.get("balance")
             telegram.post_signal(our_symbol, getattr(strat, "label", strat.key),
                                  intent["side"], res["price"], sl, tp,
                                  confidence=conf, label=conviction.label(conf),
                                  reason=intent.get("reason", ""),
                                  lots=lots, risk_usd=risk_usd,
-                                 timeframe=getattr(strat, "timeframe", None))
+                                 timeframe=getattr(strat, "timeframe", None),
+                                 notional_usd=notional_usd, balance=balance)
             return True
         comment = (res.get("comment") or res.get("error") or "").lower()
         # "Market closed" / "no prices" are NOT transient — the market is shut
@@ -226,8 +235,10 @@ class Orchestrator:
         self._record(f"[{strat.key}] CLOSED {our_symbol} "
                      f"({intent['reason']}) ok={res['ok']}")
         if res.get("ok"):
+            snap = self.bridge.account_snapshot() or {}
             telegram.post_close(our_symbol, getattr(strat, "label", strat.key),
-                                profit, reason=intent.get("reason", ""))
+                                profit, reason=intent.get("reason", ""),
+                                balance=snap.get("balance"))
 
     def _scan_set(self, strat_key, our_symbol, status, detail="", extra=None):
         """Record what one strategy saw on one symbol this poll (for the UI)."""

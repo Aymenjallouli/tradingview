@@ -80,9 +80,10 @@ def _decimals(price):
 
 def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
                 label=None, reason="", lots=None, risk_usd=None,
-                timeframe=None):
+                timeframe=None, notional_usd=None, balance=None):
     """Post a full new-entry signal: exact entry/SL/TP, position size (lots +
-    $ risk), reward:risk, confidence, and an estimated hold time."""
+    $ invested + $ risk), the $ profit if TP hits and the resulting balance,
+    reward:risk, confidence, and an estimated hold time."""
     emoji = "🟢" if side == "buy" else "🔴"
     arrow = "LONG ▲ (buy)" if side == "buy" else "SHORT ▼ (sell)"
     d = _decimals(price)
@@ -92,6 +93,9 @@ def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
     rr = (rew_dist / risk_dist) if risk_dist > 0 else 0
     sl_pct = risk_dist / price * 100
     tp_pct = rew_dist / price * 100
+    # $ profit if TP hits = risk $ * reward:risk (same money mechanics)
+    profit_at_tp = (abs(risk_usd) * rr) if risk_usd is not None else None
+    loss_at_sl = abs(risk_usd) if risk_usd is not None else None
 
     lines = [f"{emoji} *SIGNAL — {symbol}*  {arrow}",
              f"*Strategy:* {strategy}"]
@@ -103,10 +107,19 @@ def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
     lines.append(f"🎯 *Take-profit:* `{tp:.{d}f}`  (+{tp_pct:.2f}%)")
     lines.append(f"⚖️ *Reward:Risk:* {rr:.1f} : 1")
     if lots is not None:
-        size = f"💰 *Size:* {lots} lots"
-        if risk_usd is not None:
-            size += f"  (risking ~${abs(risk_usd):.0f} if stop hit)"
+        size = f"💰 *Buy:* {lots} lots"
+        if notional_usd is not None:
+            size += f"  (~${notional_usd:,.0f} position value)"
         lines.append(size)
+    # --- the money math the user asked for ---
+    if profit_at_tp is not None:
+        lines.append("")
+        lines.append(f"✅ *If TP hits:* +${profit_at_tp:,.2f}"
+                     + (f"  →  balance ${balance + profit_at_tp:,.2f}"
+                        if balance is not None else ""))
+        lines.append(f"❌ *If SL hits:* −${loss_at_sl:,.2f}"
+                     + (f"  →  balance ${balance - loss_at_sl:,.2f}"
+                        if balance is not None else ""))
     if timeframe:
         est = _HOLD_ESTIMATE.get(timeframe, "varies")
         lines.append(f"⏱️ *Est. hold:* {est}  ({timeframe} strategy)")
@@ -115,11 +128,12 @@ def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
     return _send("\n".join(lines))
 
 
-def post_close(symbol, strategy, profit, reason=""):
-    """Post a closed trade (honest — wins AND losses)."""
+def post_close(symbol, strategy, profit, reason="", balance=None):
+    """Post a closed trade (honest — wins AND losses) with the new balance."""
     emoji = "✅" if profit >= 0 else "❌"
+    bal = f"\n*New balance:* ${balance:,.2f}" if balance is not None else ""
     txt = (f"{emoji} *CLOSED — {symbol}*  ({strategy})\n"
-           f"*Result:* {'+' if profit>=0 else ''}{round(profit,2)} USD\n"
+           f"*Result:* {'+' if profit>=0 else ''}{round(profit,2)} USD{bal}\n"
            f"_{reason}_"
            f"{DISCLAIMER}")
     return _send(txt)
