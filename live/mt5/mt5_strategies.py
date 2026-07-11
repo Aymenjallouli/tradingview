@@ -798,7 +798,10 @@ def build_book_metals():
     """BOOK 1 — LONG-TERM METALS (gold + silver), slow trend/breakout.
     Winners (backtested PF): gold trend 1d 6.77, trend 4h 5.35, donchian 4h
     3.05, burst 4h 2.15, donchian 1d 1.95; silver trend 4h 3.64, trend 1d 2.18,
-    donchian 4h 2.14. All long-term — rides the big metal moves."""
+    donchian 4h 2.14. All long-term — rides the big metal moves.
+    Plus the Pattern Engine (4h): double-bottom + ascending-triangle geometry
+    (gold 4h PF 1.64 / 3.19, backtested)."""
+    from mt5_patterns import PatternEngine
     trend4h = Trend4h()
     trenddaily = MetalsTrendDaily()          # 20/100 cross on the daily
     strategies = [
@@ -807,6 +810,7 @@ def build_book_metals():
         DonchianBreakout(),      # 4h + 1d breakout (gold 3.05 / silver 2.14)
         MomentumBurst(),         # 4h burst (gold 2.15; silver weak -> gold only)
         MetalsBollingerDaily(),  # daily mean-reversion floor (high win rate)
+        PatternEngine(timeframe="4h"),   # chart patterns (double-bottom/asc-tri)
     ]
     return _restrict(strategies, {"XAUUSD", "XAGUSD"})
 
@@ -815,11 +819,13 @@ def build_book_shortterm():
     """BOOK 2 — SHORT-TERM (fast 15m/1h metals). Winners: gold range 1h 4.08
     (90% win!), gold pulse 1h 1.40, gold scalp 15m 1.43, silver pulse 1h 1.46.
     Plus 1h shorts for down-moves. Fast = more action, disciplined."""
+    from mt5_patterns import PatternEngine
     strategies = [
         MetalsRange(),           # 1h range (gold PF 4.08, 90% win)
         MetalPulse(),            # 1h breakout+bounce (gold 1.40 / silver 1.46)
         GoldScalp15m(),          # 15m gold momentum (1.43) — gold only
         MetalsShort1h(),         # 1h shorts (down-moves)
+        PatternEngine(timeframe="1h"),   # chart patterns 1h (silver DB 2.23!)
     ]
     return _restrict(strategies, {"XAUUSD", "XAGUSD"})
 
