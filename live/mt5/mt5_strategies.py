@@ -781,6 +781,136 @@ class MetalsRange:
         return []
 
 
+# ---------------------------------------------------------------------------
+# SHORT-TERM generic strategies (work on ANY asset, restricted per-bot). These
+# are the winners from the cross-asset short-term sweep: RANGE (RSI mean-
+# reversion, ranging-only) dominates; BURST (momentum + ATR trail) for the
+# trendier ones. Timeframe set per instance (15m or 1h).
+# ---------------------------------------------------------------------------
+class STRange:
+    """Short-term range: buy oversold (RSI<25) ONLY when ranging (near 50-EMA).
+    The cross-asset winner — gold 4.86, USDJPY 5.37, AUDUSD 3.66, US500 2.50."""
+    key = "st_range"
+    label = "Short-Term Range (RSI)"
+    direction = "long"
+    stop_pct = 0.015
+    target_pct = 0.022
+
+    def __init__(self, timeframe="1h", symbols=None):
+        self.timeframe = timeframe
+        self.allowed_symbols = set(symbols) if symbols else None
+
+    def _atr(self, df, p=14):
+        h, l, c = df["high"], df["low"], df["close"]
+        pc = c.shift(1)
+        tr = pd.concat([h - l, (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
+        return tr.ewm(alpha=1 / p, adjust=False).mean()
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 60:
+            return []
+        r = _rsi(df["close"], 14)
+        e50 = _ema(df["close"], 50)
+        atrv = self._atr(df, 14)
+        i = len(df) - 1
+        c = df["close"].iloc[i]
+        if has_position:
+            if r.iloc[i] > 55:
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "RSI recovered — range exit"}]
+            return []
+        ranging = abs(c - e50.iloc[i]) < 1.5 * atrv.iloc[i]
+        if ranging and r.iloc[i] < 25:
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "oversold dip in a range"}]
+        return []
+
+
+class STBurst:
+    """Short-term burst: big momentum candle + volume breakout, ATR trailing
+    exit. Winner on silver 1.72, GBPUSD 1.47, NatGas 1.70."""
+    key = "st_burst"
+    label = "Short-Term Burst (momentum)"
+    direction = "long"
+    stop_pct = 0.02
+    target_pct = 0.05
+
+    def __init__(self, timeframe="1h", symbols=None):
+        self.timeframe = timeframe
+        self.allowed_symbols = set(symbols) if symbols else None
+
+    def _atr(self, df, p=14):
+        h, l, c = df["high"], df["low"], df["close"]
+        pc = c.shift(1)
+        tr = pd.concat([h - l, (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
+        return tr.ewm(alpha=1 / p, adjust=False).mean()
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 60:
+            return []
+        df = df.copy()
+        e50 = _ema(df["close"], 50)
+        rng = df["high"] - df["low"]
+        i = len(df) - 1
+        o, h, l, c = (df["open"].iloc[i], df["high"].iloc[i],
+                      df["low"].iloc[i], df["close"].iloc[i])
+        if has_position:
+            atrv = self._atr(df, 14).iloc[i]
+            recent_high = df["close"].iloc[-8:].max()
+            if c < recent_high - 2.5 * atrv:
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "ATR trailing stop"}]
+            return []
+        avg_r = rng.iloc[-21:-1].mean()
+        avg_v = df["tick_volume"].iloc[-21:-1].mean()
+        body = abs(c - o)
+        r = (h - l) if h > l else 1e-9
+        hi20 = df["high"].iloc[-21:-1].max()
+        if (rng.iloc[i] >= 1.8 * avg_r and body >= 0.6 * r
+                and (c - l) >= 0.7 * r
+                and df["tick_volume"].iloc[i] >= 1.3 * avg_v
+                and c > hi20 and c > e50.iloc[i]):
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "momentum burst breakout"}]
+        return []
+
+
+# ---------------------------------------------------------------------------
+# FOUR SHORT-TERM ASSET-CLASS BOOKS — each its best short-term strategy per
+# asset (cross-asset sweep, cost-included). RANGE dominates; BURST for trendy.
+# ---------------------------------------------------------------------------
+def build_st_metals():
+    """Gold (range 1h PF 4.86, 88% win) + Silver (burst 1h 1.72)."""
+    return [STRange("1h", {"XAUUSD"}), STBurst("1h", {"XAGUSD", "XAUUSD"})]
+
+
+def build_st_forex():
+    """USDJPY (range 15m 5.37!), AUDUSD (range 1h 3.66), EURUSD (range 1h 1.90),
+    GBPUSD (burst 1h 1.47)."""
+    return [
+        STRange("15m", {"USDJPY"}),
+        STRange("1h", {"AUDUSD", "EURUSD"}),
+        STBurst("1h", {"GBPUSD"}),
+    ]
+
+
+def build_st_indices():
+    """US500 (range 1h 2.50), US100 (range 1h 1.67), Crude (range 15m 1.73),
+    NatGas (burst 1h 1.70)."""
+    return [
+        STRange("1h", {"US500", "US100"}),
+        STRange("15m", {"CRUDE"}),
+        STBurst("1h", {"NATGAS"}),
+    ]
+
+
+def build_st_crypto():
+    """Weekend book — BTC range 1h (PF 1.23, marginal but positive; 24/7)."""
+    return [STRange("1h", {"BTCUSD", "ETHUSD"})]
+
+
 # ===========================================================================
 # THREE CLEAN BOOKS — each with ONLY its backtest-winning strategies (fresh
 # rebuild, cost-included PFs shown). Rejected losers are excluded.

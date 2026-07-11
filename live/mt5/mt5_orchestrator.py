@@ -30,7 +30,9 @@ import mt5_conviction as conviction
 import mt5_telegram as telegram
 from mt5_strategies import (build_strategies, build_gold_focus_strategies,
                             build_daytrader_strategies, build_book_metals,
-                            build_book_shortterm, build_book_crypto)
+                            build_book_shortterm, build_book_crypto,
+                            build_st_metals, build_st_forex, build_st_indices,
+                            build_st_crypto)
 
 
 import mt5_log
@@ -159,7 +161,20 @@ class Orchestrator:
         #   "shortterm" -> fast 15m/1h metals (+ day-trader limits if DAYTRADER)
         #   "crypto"    -> BTC/ETH momentum
         book = os.getenv("MT5_BOOK", "").lower()
-        if book == "metals":
+        # SHORT-TERM asset-class books (pure short-term, best strategy per asset)
+        if book == "st_metals":
+            self.strategies = build_st_metals()
+            _log("*** SHORT-TERM METALS (gold/silver) ***")
+        elif book == "st_forex":
+            self.strategies = build_st_forex()
+            _log("*** SHORT-TERM FOREX (JPY/AUD/EUR/GBP) ***")
+        elif book == "st_indices":
+            self.strategies = build_st_indices()
+            _log("*** SHORT-TERM INDICES+ENERGY (US500/US100/oil/gas) ***")
+        elif book == "st_crypto":
+            self.strategies = build_st_crypto()
+            _log("*** SHORT-TERM CRYPTO (BTC/ETH, weekend book) ***")
+        elif book == "metals":
             self.strategies = build_book_metals()
             _log("*** BOOK 1 — LONG-TERM METALS (gold/silver) ***")
         elif book == "shortterm":

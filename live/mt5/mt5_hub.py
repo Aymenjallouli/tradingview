@@ -26,9 +26,11 @@ import uvicorn
 app = FastAPI(title="MT5 Hub")
 
 BOOKS = [
-    {"key": "metals", "name": "METALS · long-term", "url": "http://localhost:8801"},
-    {"key": "short", "name": "SHORT-TERM · fast", "url": "http://localhost:8802"},
-    {"key": "crypto", "name": "CRYPTO · BTC/ETH", "url": "http://localhost:8803"},
+    {"key": "metals_lt", "name": "METALS-LT ✓validated", "url": "http://localhost:8801"},
+    {"key": "metals_st", "name": "METALS short-term", "url": "http://localhost:8802"},
+    {"key": "forex", "name": "FOREX short-term", "url": "http://localhost:8803"},
+    {"key": "indices", "name": "INDICES+ENERGY", "url": "http://localhost:8804"},
+    {"key": "crypto", "name": "CRYPTO short-term", "url": "http://localhost:8805"},
 ]
 
 
