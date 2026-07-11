@@ -148,11 +148,16 @@ class Orchestrator:
         self.bridge = bridge
         self.dry_run = dry_run
         self.governor = RiskGovernor(bridge)
+        # Regime brain: gate entries by the DAILY trend (backtested — turned
+        # losing crypto strategies into winners). On by default; MT5_REGIME=0
+        # to disable.
+        from mt5_regime import RegimeBrain
+        self.regime = RegimeBrain(bridge)
+        self.regime_on = os.getenv("MT5_REGIME", "1") == "1"
         # Book selection via MT5_BOOK (the clean 3-book architecture):
         #   "metals"    -> long-term gold/silver trend & breakout
         #   "shortterm" -> fast 15m/1h metals (+ day-trader limits if DAYTRADER)
         #   "crypto"    -> BTC/ETH momentum
-        # Falls back to legacy modes if MT5_BOOK is unset.
         book = os.getenv("MT5_BOOK", "").lower()
         if book == "metals":
             self.strategies = build_book_metals()
@@ -204,6 +209,13 @@ class Orchestrator:
         tick = self.bridge.tick(our_symbol)
         if not broker or not tick:
             return
+        # REGIME FILTER: don't fight the daily trend (backtested — turned losing
+        # crypto strategies into winners). Longs need daily-up, shorts daily-down.
+        if self.regime_on:
+            ok, why = self.regime.allows(our_symbol, intent["side"])
+            if not ok:
+                self._record(f"[{strat.key}] {our_symbol}: SKIP — {why}")
+                return True     # not a transient failure — wait for a new candle
         price = tick["ask"] if intent["side"] == "buy" else tick["bid"]
         # SL/TP prices from the strategy's percentages (direction-aware).
         if intent["side"] == "buy":
