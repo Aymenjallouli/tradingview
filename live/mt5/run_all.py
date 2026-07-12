@@ -48,9 +48,15 @@ def _env(**overrides):
 def main():
     procs = []
     for b in BOOKS:
+        # Confidence sizing 3% (low) -> 8% (high-confidence strategies), the
+        # user's aggressive choice. The oversize-guard skips any instrument
+        # whose min-lot exceeds the cap, and the daily circuit breaker (12%)
+        # stops a bad streak from cascading. No trade is "guaranteed" — even the
+        # 8% ones are capped and streak-protected.
         env = _env(MT5_BOOK=b["book"], MT5_MAGIC=b["magic"],
                    MT5_DASH_PORT=b["port"],
-                   MT5_RISK_MIN="1.0", MT5_RISK_MAX="2.0",
+                   MT5_RISK_MIN="3.0", MT5_RISK_MAX="8.0",
+                   MT5_DAILY_STOP="0.12",
                    MT5_REGIME="1", MT5_GOLD_FOCUS="0",
                    MT5_DAYTRADER="0", MT5_PYRAMID="0")
         procs.append(subprocess.Popen([PY, "-u", "mt5_dashboard.py", *DRY],

@@ -261,6 +261,26 @@ class Orchestrator:
             self._record(f"[{strat.key}] {our_symbol}: skip — lot size 0 "
                          f"(risk/stop invalid)")
             return True          # not a transient failure — don't hammer-retry
+        # OVERSIZE GUARD: if even this (already min-clamped) lot risks more than
+        # MAX_RISK_PCT of the account, the instrument is too big for the account
+        # (e.g. NASDAQ min-lot = 11% on $760). SKIP it — never blow up on a
+        # market you can't size safely. No "guaranteed" trade justifies this.
+        if mt5 is not None:
+            info = mt5.symbol_info(broker)
+            if info and info.trade_tick_value and info.trade_tick_size:
+                real_risk = (abs(price - sl) / info.trade_tick_size
+                             * info.trade_tick_value * lots)
+                real_equity = ((self.bridge.account_snapshot() or {})
+                               .get("balance") or equity)
+                real_pct = real_risk / real_equity * 100 if real_equity else 99
+                # cap against the ACTUAL max conviction risk (e.g. 8%), + a
+                # little tolerance. Above this, the min-lot is simply too big.
+                cap = conviction.RISK_MAX_PCT * 1.2
+                if real_pct > cap:
+                    self._record(f"[{strat.key}] {our_symbol}: SKIP — min lot "
+                                 f"risks {real_pct:.1f}% (> {cap:.0f}% cap); "
+                                 f"instrument too big for ${real_equity:.0f} acct")
+                    return True
         allowed, reason = self.governor.can_open(strat.key)
         if not allowed:
             self._record(f"[{strat.key}] {our_symbol}: BLOCKED — {reason}")
