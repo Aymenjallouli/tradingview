@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover
 import mt5_orders as orders
 import mt5_conviction as conviction
 import mt5_telegram as telegram
+import mt5_tradelog as tradelog
 from mt5_strategies import (build_strategies, build_gold_focus_strategies,
                             build_daytrader_strategies, build_book_metals,
                             build_book_shortterm, build_book_crypto,
@@ -161,8 +162,16 @@ class Orchestrator:
         #   "shortterm" -> fast 15m/1h metals (+ day-trader limits if DAYTRADER)
         #   "crypto"    -> BTC/ETH momentum
         book = os.getenv("MT5_BOOK", "").lower()
+        # VALIDATED asset-class books — data-driven from validated_strategies.json
+        # (only walk-forward survivors, strict bar). Prefixed "v_".
+        if book.startswith("v_"):
+            from mt5_strategies import build_validated_book
+            cls = book[2:]                     # v_indices -> indices
+            self.strategies = build_validated_book(cls)
+            _log(f"*** VALIDATED BOOK — {cls.upper()} "
+                 f"({len(self.strategies)} strategies) ***")
         # SHORT-TERM asset-class books (pure short-term, best strategy per asset)
-        if book == "st_metals":
+        elif book == "st_metals":
             self.strategies = build_st_metals()
             _log("*** SHORT-TERM METALS (gold/silver) ***")
         elif book == "st_forex":
@@ -290,6 +299,10 @@ class Orchestrator:
                                  lots=lots, risk_usd=risk_usd,
                                  timeframe=getattr(strat, "timeframe", None),
                                  notional_usd=notional_usd, balance=balance)
+            # Persistent trade journal (exact strategy per trade).
+            tradelog.log_open(os.getenv("MT5_BOOK", "?"), strat.key, our_symbol,
+                              intent["side"], lots, res["price"], sl, tp,
+                              confidence=conf, reason=intent.get("reason", ""))
             return True
         comment = (res.get("comment") or res.get("error") or "").lower()
         # "Market closed" / "no prices" are NOT transient — the market is shut
@@ -331,6 +344,8 @@ class Orchestrator:
             telegram.post_close(our_symbol, getattr(strat, "label", strat.key),
                                 profit, reason=intent.get("reason", ""),
                                 balance=snap.get("balance"))
+            tradelog.log_close(os.getenv("MT5_BOOK", "?"), strat.key,
+                               our_symbol, profit, reason=intent.get("reason", ""))
 
     def _scan_set(self, strat_key, our_symbol, status, detail="", extra=None):
         """Record what one strategy saw on one symbol this poll (for the UI)."""

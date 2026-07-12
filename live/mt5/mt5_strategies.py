@@ -1008,6 +1008,125 @@ class WilliamsR:
 # FOUR SHORT-TERM ASSET-CLASS BOOKS — each its best short-term strategy per
 # asset (cross-asset sweep, cost-included). RANGE dominates; BURST for trendy.
 # ---------------------------------------------------------------------------
+# Generic DonchTrend + RangeRSI (used by the JSON-driven master builder). These
+# match the exact logic from the master validation sweep.
+# ---------------------------------------------------------------------------
+class DonchTrend:
+    """Donchian breakout + wide (4x ATR) trailing stop — trend-follow, let
+    winners run. Validated on gold/silver/indices/crypto/energy."""
+    key = "donchtrend"
+    label = "Donchian Trend (4x ATR trail)"
+    direction = "long"
+    stop_pct = 0.06
+    target_pct = 0.50
+
+    def __init__(self, timeframe="4h", symbols=None):
+        self.timeframe = timeframe
+        self.allowed_symbols = set(symbols) if symbols else None
+
+    def _atr(self, df, p=20):
+        h, l, c = df["high"], df["low"], df["close"]
+        pc = c.shift(1)
+        tr = pd.concat([h - l, (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
+        return tr.ewm(alpha=1 / p, adjust=False).mean()
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 45:
+            return []
+        h = df["high"].values
+        c = df["close"].values
+        i = len(df) - 1
+        atrv = self._atr(df, 20).iloc[i]
+        if has_position:
+            trail = df["close"].iloc[-15:].max() - 4.0 * atrv
+            if c[i] < trail:
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "4x ATR trailing stop"}]
+            return []
+        if c[i] > max(h[i - 20:i]):
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "20-bar high breakout (trend)"}]
+        return []
+
+
+class RangeRSI:
+    """RSI range: buy RSI<30 when ranging (near 50-EMA), exit RSI>55.
+    Validated on gold/forex/indices."""
+    key = "rangersi"
+    label = "Range RSI (ranging-only)"
+    direction = "long"
+    stop_pct = 0.02
+    target_pct = 0.028
+
+    def __init__(self, timeframe="4h", symbols=None):
+        self.timeframe = timeframe
+        self.allowed_symbols = set(symbols) if symbols else None
+
+    def _atr(self, df, p=14):
+        h, l, c = df["high"], df["low"], df["close"]
+        pc = c.shift(1)
+        tr = pd.concat([h - l, (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
+        return tr.ewm(alpha=1 / p, adjust=False).mean()
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 60:
+            return []
+        r = _rsi(df["close"], 14)
+        e50 = _ema(df["close"], 50)
+        a = self._atr(df, 14)
+        i = len(df) - 1
+        c = df["close"].iloc[i]
+        if has_position:
+            if r.iloc[i] > 55:
+                return [{"type": "close", "symbol": symbol,
+                         "reason": "RSI recovered"}]
+            return []
+        if abs(c - e50.iloc[i]) < 2.0 * a.iloc[i] and r.iloc[i] < 30:
+            return [{"type": "open", "side": "buy", "symbol": symbol,
+                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "reason": "RSI oversold in range"}]
+        return []
+
+
+# Map the sweep's method names to their strategy classes.
+_METHOD_MAP = {
+    "Keltner": Keltner, "Stochastic": Stochastic, "WilliamsR": WilliamsR,
+    "CryptoTrend": DonchTrend, "DonchTrend": DonchTrend, "RangeRSI": RangeRSI,
+}
+
+import json as _json
+import os as _os
+_VALIDATED_PATH = _os.path.join(_os.path.dirname(__file__),
+                                "validated_strategies.json")
+
+
+def _load_validated():
+    try:
+        with open(_VALIDATED_PATH) as f:
+            return _json.load(f)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def build_validated_book(asset_class):
+    """Build a book from validated_strategies.json for one asset class. One
+    strategy instance per (method, timeframe), holding all its validated symbols.
+    This is the CLEAN, data-driven book — only walk-forward survivors trade."""
+    rows = [r for r in _load_validated() if r["class"] == asset_class]
+    # group by (method, tf) -> set of symbols
+    groups = {}
+    for r in rows:
+        cls = _METHOD_MAP.get(r["method"])
+        if cls is None:
+            continue
+        groups.setdefault((cls, r["tf"]), set()).add(r["symbol"])
+    strategies = []
+    for (cls, tf), syms in groups.items():
+        strategies.append(cls(timeframe=tf, symbols=syms))
+    return strategies
+
+
 def build_st_metals():
     """Gold range 1h at the LOOSER walk-forward-VALIDATED setting (RSI<30,
     range mult 2.0 -> OOS PF 2.76 on 76 unseen trades, ~4x more action than
