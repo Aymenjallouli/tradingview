@@ -1013,12 +1013,18 @@ class WilliamsR:
 # ---------------------------------------------------------------------------
 class DonchTrend:
     """Donchian breakout + wide (4x ATR) trailing stop — trend-follow, let
-    winners run. Validated on gold/silver/indices/crypto/energy."""
+    winners run. Validated on gold/silver/indices/crypto/energy.
+
+    SL/TP are ATR-BASED (realistic), not a dumb fixed %: the broker stop sits
+    ~4x ATR below entry (matching the trailing logic, so normal pullbacks don't
+    stop it out early), and the TP is a reachable ~6x ATR (not a fantasy +50%).
+    The real exit is still the trailing stop, which ratchets up as price climbs.
+    """
     key = "donchtrend"
     label = "Donchian Trend (4x ATR trail)"
     direction = "long"
-    stop_pct = 0.06
-    target_pct = 0.50
+    stop_pct = 0.06          # fallback only; real SL is ATR-based (see below)
+    target_pct = 0.20
 
     def __init__(self, timeframe="4h", symbols=None):
         self.timeframe = timeframe
@@ -1037,6 +1043,7 @@ class DonchTrend:
         c = df["close"].values
         i = len(df) - 1
         atrv = self._atr(df, 20).iloc[i]
+        price = c[i]
         if has_position:
             trail = df["close"].iloc[-15:].max() - 4.0 * atrv
             if c[i] < trail:
@@ -1044,8 +1051,12 @@ class DonchTrend:
                          "reason": "4x ATR trailing stop"}]
             return []
         if c[i] > max(h[i - 20:i]):
+            # ATR-based, REALISTIC levels: stop ~4x ATR (won't trip on noise),
+            # target ~6x ATR (actually reachable — a real 1.5:1 trend target).
+            stop_pct = min(0.08, max(0.01, 4.0 * atrv / price))
+            target_pct = min(0.25, max(0.015, 6.0 * atrv / price))
             return [{"type": "open", "side": "buy", "symbol": symbol,
-                     "stop_pct": self.stop_pct, "target_pct": self.target_pct,
+                     "stop_pct": stop_pct, "target_pct": target_pct,
                      "reason": "20-bar high breakout (trend)"}]
         return []
 
