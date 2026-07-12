@@ -788,17 +788,22 @@ class MetalsRange:
 # trendier ones. Timeframe set per instance (15m or 1h).
 # ---------------------------------------------------------------------------
 class STRange:
-    """Short-term range: buy oversold (RSI<25) ONLY when ranging (near 50-EMA).
-    The cross-asset winner — gold 4.86, USDJPY 5.37, AUDUSD 3.66, US500 2.50."""
+    """Short-term range: buy oversold when ranging (near 50-EMA).
+    Walk-forward VALIDATED only on gold at the LOOSER setting (RSI<30, range
+    mult 2.0 -> OOS PF 2.76 on 76 unseen trades, ~4x the strict frequency).
+    Other assets collapsed out-of-sample at every setting — kept strict where
+    still used, but the real edge is gold. rsi_buy / rng_mult tunable per bot."""
     key = "st_range"
     label = "Short-Term Range (RSI)"
     direction = "long"
     stop_pct = 0.015
     target_pct = 0.022
 
-    def __init__(self, timeframe="1h", symbols=None):
+    def __init__(self, timeframe="1h", symbols=None, rsi_buy=25, rng_mult=1.5):
         self.timeframe = timeframe
         self.allowed_symbols = set(symbols) if symbols else None
+        self.rsi_buy = rsi_buy
+        self.rng_mult = rng_mult
 
     def _atr(self, df, p=14):
         h, l, c = df["high"], df["low"], df["close"]
@@ -819,8 +824,8 @@ class STRange:
                 return [{"type": "close", "symbol": symbol,
                          "reason": "RSI recovered — range exit"}]
             return []
-        ranging = abs(c - e50.iloc[i]) < 1.5 * atrv.iloc[i]
-        if ranging and r.iloc[i] < 25:
+        ranging = abs(c - e50.iloc[i]) < self.rng_mult * atrv.iloc[i]
+        if ranging and r.iloc[i] < self.rsi_buy:
             return [{"type": "open", "side": "buy", "symbol": symbol,
                      "stop_pct": self.stop_pct, "target_pct": self.target_pct,
                      "reason": "oversold dip in a range"}]
@@ -882,8 +887,12 @@ class STBurst:
 # asset (cross-asset sweep, cost-included). RANGE dominates; BURST for trendy.
 # ---------------------------------------------------------------------------
 def build_st_metals():
-    """Gold (range 1h PF 4.86, 88% win) + Silver (burst 1h 1.72)."""
-    return [STRange("1h", {"XAUUSD"}), STBurst("1h", {"XAGUSD", "XAUUSD"})]
+    """Gold range 1h at the LOOSER walk-forward-VALIDATED setting (RSI<30,
+    range mult 2.0 -> OOS PF 2.76 on 76 unseen trades, ~4x more action than
+    strict) + Silver burst 1h. Gold range is the one short-term edge that held
+    out-of-sample."""
+    return [STRange("1h", {"XAUUSD"}, rsi_buy=30, rng_mult=2.0),
+            STBurst("1h", {"XAGUSD"})]
 
 
 def build_st_forex():
