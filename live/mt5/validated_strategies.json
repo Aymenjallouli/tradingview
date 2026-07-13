@@ -913,17 +913,6 @@
     "class": "indices"
   },
   {
-    "symbol": "WHEAT",
-    "method": "ShortKeltner",
-    "tf": "4h",
-    "is_pf": 1.28,
-    "oos_pf": 2.78,
-    "oos_n": 72,
-    "oos_win": 83,
-    "trades_per_month": 1.6,
-    "class": "softs"
-  },
-  {
     "symbol": "US500",
     "method": "ZScoreMR",
     "tf": "4h",
@@ -1089,17 +1078,6 @@
     "class": "indices"
   },
   {
-    "symbol": "AUS200",
-    "method": "ShortKeltner",
-    "tf": "1h",
-    "is_pf": 1.3,
-    "oos_pf": 1.8,
-    "oos_n": 78,
-    "oos_win": 68,
-    "trades_per_month": 6.6,
-    "class": "indices"
-  },
-  {
     "symbol": "GBPJPY",
     "method": "RSIdiverg",
     "tf": "1h",
@@ -1175,17 +1153,6 @@
     "oos_win": 69,
     "trades_per_month": 5.8,
     "class": "forex"
-  },
-  {
-    "symbol": "AUS200",
-    "method": "ShortKeltner",
-    "tf": "4h",
-    "is_pf": 1.33,
-    "oos_pf": 1.52,
-    "oos_n": 76,
-    "oos_win": 72,
-    "trades_per_month": 1.5,
-    "class": "indices"
   },
   {
     "symbol": "NAS100",
@@ -1265,17 +1232,6 @@
     "class": "indices"
   },
   {
-    "symbol": "WHEAT",
-    "method": "ShortWilliams",
-    "tf": "4h",
-    "is_pf": 1.28,
-    "oos_pf": 1.47,
-    "oos_n": 144,
-    "oos_win": 63,
-    "trades_per_month": 3.1,
-    "class": "softs"
-  },
-  {
     "symbol": "EURJPY",
     "method": "RSIdiverg",
     "tf": "1h",
@@ -1296,17 +1252,6 @@
     "oos_win": 62,
     "trades_per_month": 5.5,
     "class": "indices"
-  },
-  {
-    "symbol": "AUDUSD",
-    "method": "ShortKeltner",
-    "tf": "4h",
-    "is_pf": 1.51,
-    "oos_pf": 1.41,
-    "oos_n": 65,
-    "oos_win": 71,
-    "trades_per_month": 1.4,
-    "class": "forex"
   },
   {
     "symbol": "GBPJPY",
@@ -1430,17 +1375,6 @@
     "class": "indices"
   },
   {
-    "symbol": "GBPJPY",
-    "method": "ShortKeltner",
-    "tf": "1h",
-    "is_pf": 2.34,
-    "oos_pf": 1.34,
-    "oos_n": 70,
-    "oos_win": 69,
-    "trades_per_month": 5.9,
-    "class": "forex"
-  },
-  {
     "symbol": "WHEAT",
     "method": "ZScoreMR",
     "tf": "4h",
@@ -1505,5 +1439,423 @@
     "oos_n": 121,
     "oos_win": 74,
     "trades_per_month": 25.0
+  },
+  {
+    "symbol": "WHEAT",
+    "method": "ShortRSIdiv",
+    "tf": "4h",
+    "is_pf": 1.27,
+    "oos_pf": 2.85,
+    "oos_n": 76,
+    "oos_win": 78,
+    "trades_per_month": 1.5,
+    "class": "softs"
+  },
+  {
+    "symbol": "WHEAT",
+    "method": "ShortKeltner",
+    "tf": "4h",
+    "is_pf": 1.28,
+    "oos_pf": 2.78,
+    "oos_n": 72,
+    "oos_win": 83,
+    "trades_per_month": 1.6,
+    "class": "softs"
+  },
+  {
+    "symbol": "NATGAS",
+    "method": "ShortDonch",
+    "tf": "4h",
+    "is_pf": 1.15,
+    "oos_pf": 2.7,
+    "oos_n": 60,
+    "oos_win": 42,
+    "trades_per_month": 1.2,
+    "class": "energy"
+  },
+  {
+    "symbol": "EURGBP",
+    "method": "ShortRSIdiv",
+    "tf": "4h",
+    "is_pf": 1.17,
+    "oos_pf": 2.35,
+    "oos_n": 80,
+    "oos_win": 81,
+    "trades_per_month": 1.5,
+    "class": "forex"
+  },
+  {
+    "symbol": "EURGBP",
+    "method": "ShortKeltner",
+    "tf": "15m",
+    "is_pf": 1.1,
+    "oos_pf": 2.04,
+    "oos_n": 86,
+    "oos_win": 74,
+    "trades_per_month": 18.3,
+    "class": "forex"
+  },
+  {
+    "symbol": "EURCHF",
+    "method": "ShortRSIdiv",
+    "tf": "1h",
+    "is_pf": 1.63,
+    "oos_pf": 1.99,
+    "oos_n": 83,
+    "oos_win": 72,
+    "trades_per_month": 6.3,
+    "class": "forex"
+  },
+  {
+    "symbol": "NZDUSD",
+    "method": "ShortRSIdiv",
+    "tf": "4h",
+    "is_pf": 1.25,
+    "oos_pf": 1.94,
+    "oos_n": 84,
+    "oos_win": 79,
+    "trades_per_month": 1.7,
+    "class": "forex"
+  },
+  {
+    "symbol": "AUS200",
+    "method": "ShortKeltner",
+    "tf": "1h",
+    "is_pf": 1.3,
+    "oos_pf": 1.8,
+    "oos_n": 78,
+    "oos_win": 68,
+    "trades_per_month": 6.6,
+    "class": "indices"
+  },
+  {
+    "symbol": "CORN",
+    "method": "ShortKeltner",
+    "tf": "4h",
+    "is_pf": 1.66,
+    "oos_pf": 1.79,
+    "oos_n": 54,
+    "oos_win": 72,
+    "trades_per_month": 1.7,
+    "class": "softs"
+  },
+  {
+    "symbol": "AUDUSD",
+    "method": "ShortRSIdiv",
+    "tf": "4h",
+    "is_pf": 1.56,
+    "oos_pf": 1.74,
+    "oos_n": 79,
+    "oos_win": 71,
+    "trades_per_month": 1.6,
+    "class": "forex"
+  },
+  {
+    "symbol": "FRA40",
+    "method": "ShortZScore",
+    "tf": "1h",
+    "is_pf": 1.19,
+    "oos_pf": 1.7,
+    "oos_n": 77,
+    "oos_win": 73,
+    "trades_per_month": 6.2,
+    "class": "indices"
+  },
+  {
+    "symbol": "EURGBP",
+    "method": "ShortRSIdiv",
+    "tf": "15m",
+    "is_pf": 1.14,
+    "oos_pf": 1.7,
+    "oos_n": 130,
+    "oos_win": 68,
+    "trades_per_month": 26.0,
+    "class": "forex"
+  },
+  {
+    "symbol": "USDCAD",
+    "method": "ShortRSIdiv",
+    "tf": "15m",
+    "is_pf": 1.3,
+    "oos_pf": 1.58,
+    "oos_n": 168,
+    "oos_win": 70,
+    "trades_per_month": 30.0,
+    "class": "forex"
+  },
+  {
+    "symbol": "EURCHF",
+    "method": "ShortZScore",
+    "tf": "1h",
+    "is_pf": 1.68,
+    "oos_pf": 1.55,
+    "oos_n": 74,
+    "oos_win": 70,
+    "trades_per_month": 5.7,
+    "class": "forex"
+  },
+  {
+    "symbol": "AUS200",
+    "method": "ShortKeltner",
+    "tf": "4h",
+    "is_pf": 1.33,
+    "oos_pf": 1.52,
+    "oos_n": 76,
+    "oos_win": 72,
+    "trades_per_month": 1.5,
+    "class": "indices"
+  },
+  {
+    "symbol": "EURCHF",
+    "method": "ShortZScore",
+    "tf": "15m",
+    "is_pf": 1.99,
+    "oos_pf": 1.52,
+    "oos_n": 129,
+    "oos_win": 72,
+    "trades_per_month": 26.5,
+    "class": "forex"
+  },
+  {
+    "symbol": "EURGBP",
+    "method": "ShortCCI",
+    "tf": "15m",
+    "is_pf": 1.37,
+    "oos_pf": 1.51,
+    "oos_n": 159,
+    "oos_win": 72,
+    "trades_per_month": 33.7,
+    "class": "forex"
+  },
+  {
+    "symbol": "BTCUSD",
+    "method": "ShortWilliams",
+    "tf": "15m",
+    "is_pf": 1.21,
+    "oos_pf": 1.51,
+    "oos_n": 257,
+    "oos_win": 71,
+    "trades_per_month": 49.9,
+    "class": "crypto"
+  },
+  {
+    "symbol": "WHEAT",
+    "method": "ShortWilliams",
+    "tf": "4h",
+    "is_pf": 1.28,
+    "oos_pf": 1.48,
+    "oos_n": 144,
+    "oos_win": 63,
+    "trades_per_month": 3.1,
+    "class": "softs"
+  },
+  {
+    "symbol": "BTCUSD",
+    "method": "ShortCCI",
+    "tf": "15m",
+    "is_pf": 1.21,
+    "oos_pf": 1.47,
+    "oos_n": 156,
+    "oos_win": 68,
+    "trades_per_month": 31.1,
+    "class": "crypto"
+  },
+  {
+    "symbol": "EURUSD",
+    "method": "ShortRSIdiv",
+    "tf": "1h",
+    "is_pf": 1.15,
+    "oos_pf": 1.46,
+    "oos_n": 64,
+    "oos_win": 70,
+    "trades_per_month": 5.5,
+    "class": "forex"
+  },
+  {
+    "symbol": "FRA40",
+    "method": "ShortCCI",
+    "tf": "1h",
+    "is_pf": 1.13,
+    "oos_pf": 1.45,
+    "oos_n": 105,
+    "oos_win": 64,
+    "trades_per_month": 8.5,
+    "class": "indices"
+  },
+  {
+    "symbol": "EURGBP",
+    "method": "ShortStoch",
+    "tf": "4h",
+    "is_pf": 1.28,
+    "oos_pf": 1.44,
+    "oos_n": 147,
+    "oos_win": 69,
+    "trades_per_month": 3.1,
+    "class": "forex"
+  },
+  {
+    "symbol": "AUS200",
+    "method": "ShortZScore",
+    "tf": "1h",
+    "is_pf": 1.82,
+    "oos_pf": 1.43,
+    "oos_n": 69,
+    "oos_win": 67,
+    "trades_per_month": 6.2,
+    "class": "indices"
+  },
+  {
+    "symbol": "EURGBP",
+    "method": "ShortZScore",
+    "tf": "4h",
+    "is_pf": 1.26,
+    "oos_pf": 1.43,
+    "oos_n": 70,
+    "oos_win": 70,
+    "trades_per_month": 1.4,
+    "class": "forex"
+  },
+  {
+    "symbol": "EURGBP",
+    "method": "ShortCCI",
+    "tf": "4h",
+    "is_pf": 1.55,
+    "oos_pf": 1.43,
+    "oos_n": 98,
+    "oos_win": 68,
+    "trades_per_month": 2.0,
+    "class": "forex"
+  },
+  {
+    "symbol": "EURCHF",
+    "method": "ShortWilliams",
+    "tf": "1h",
+    "is_pf": 1.17,
+    "oos_pf": 1.42,
+    "oos_n": 160,
+    "oos_win": 69,
+    "trades_per_month": 13.1,
+    "class": "forex"
+  },
+  {
+    "symbol": "SOYBEANS",
+    "method": "ShortCCI",
+    "tf": "4h",
+    "is_pf": 1.24,
+    "oos_pf": 1.42,
+    "oos_n": 94,
+    "oos_win": 70,
+    "trades_per_month": 2.0,
+    "class": "softs"
+  },
+  {
+    "symbol": "AUDUSD",
+    "method": "ShortKeltner",
+    "tf": "4h",
+    "is_pf": 1.5,
+    "oos_pf": 1.39,
+    "oos_n": 65,
+    "oos_win": 71,
+    "trades_per_month": 1.4,
+    "class": "forex"
+  },
+  {
+    "symbol": "USDCAD",
+    "method": "ShortKeltner",
+    "tf": "15m",
+    "is_pf": 1.15,
+    "oos_pf": 1.38,
+    "oos_n": 119,
+    "oos_win": 66,
+    "trades_per_month": 23.2,
+    "class": "forex"
+  },
+  {
+    "symbol": "EURCHF",
+    "method": "ShortKeltner",
+    "tf": "4h",
+    "is_pf": 1.36,
+    "oos_pf": 1.38,
+    "oos_n": 51,
+    "oos_win": 75,
+    "trades_per_month": 1.0,
+    "class": "forex"
+  },
+  {
+    "symbol": "BTCUSD",
+    "method": "ShortStoch",
+    "tf": "15m",
+    "is_pf": 1.14,
+    "oos_pf": 1.38,
+    "oos_n": 259,
+    "oos_win": 68,
+    "trades_per_month": 51.1,
+    "class": "crypto"
+  },
+  {
+    "symbol": "BTCUSD",
+    "method": "ShortDualTF",
+    "tf": "4h",
+    "is_pf": 1.4,
+    "oos_pf": 1.37,
+    "oos_n": 155,
+    "oos_win": 50,
+    "trades_per_month": 3.2,
+    "class": "crypto"
+  },
+  {
+    "symbol": "GBPJPY",
+    "method": "ShortKeltner",
+    "tf": "1h",
+    "is_pf": 2.34,
+    "oos_pf": 1.34,
+    "oos_n": 70,
+    "oos_win": 69,
+    "trades_per_month": 5.9,
+    "class": "forex"
+  },
+  {
+    "symbol": "NZDUSD",
+    "method": "ShortZScore",
+    "tf": "4h",
+    "is_pf": 1.42,
+    "oos_pf": 1.33,
+    "oos_n": 67,
+    "oos_win": 70,
+    "trades_per_month": 1.4,
+    "class": "forex"
+  },
+  {
+    "symbol": "EURUSD",
+    "method": "ShortCCI",
+    "tf": "4h",
+    "is_pf": 1.42,
+    "oos_pf": 1.32,
+    "oos_n": 100,
+    "oos_win": 67,
+    "trades_per_month": 2.0,
+    "class": "forex"
+  },
+  {
+    "symbol": "UK100",
+    "method": "ShortZScore",
+    "tf": "1h",
+    "is_pf": 1.31,
+    "oos_pf": 1.31,
+    "oos_n": 78,
+    "oos_win": 71,
+    "trades_per_month": 6.4,
+    "class": "indices"
+  },
+  {
+    "symbol": "EURCHF",
+    "method": "ShortCCI",
+    "tf": "1h",
+    "is_pf": 1.63,
+    "oos_pf": 1.3,
+    "oos_n": 104,
+    "oos_win": 62,
+    "trades_per_month": 8.5,
+    "class": "forex"
   }
 ]

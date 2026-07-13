@@ -1468,14 +1468,202 @@ class ShortWilliams:
         return []
 
 
+# ---------------------------------------------------------------------------
+# SHORT-SIDE strategies — we were 96% long-only; these fix that gap. All
+# walk-forward validated (38 survivors). The 15m ones fire 23-51x/month.
+# ---------------------------------------------------------------------------
+class _ShortBase:
+    """Shared plumbing for the short strategies."""
+    direction = "short"
+    stop_pct = 0.02
+    target_pct = 0.03
+
+    def __init__(self, timeframe="4h", symbols=None):
+        self.timeframe = timeframe
+        self.allowed_symbols = set(symbols) if symbols else None
+
+    def _atr(self, df, p=20):
+        h, l, c = df["high"], df["low"], df["close"]
+        pc = c.shift(1)
+        tr = pd.concat([h - l, (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
+        return tr.ewm(alpha=1 / p, adjust=False).mean()
+
+    @staticmethod
+    def _open(symbol, strat, reason):
+        return [{"type": "open", "side": "sell", "symbol": symbol,
+                 "stop_pct": strat.stop_pct, "target_pct": strat.target_pct,
+                 "reason": reason}]
+
+    @staticmethod
+    def _close(symbol, reason):
+        return [{"type": "close", "symbol": symbol, "reason": reason}]
+
+
+class ShortZScore(_ShortBase):
+    """SHORT when z-score > +2 (2 std-devs ABOVE mean); cover at the mean."""
+    key = "s_zscore"
+    label = "Short Z-Score (overextended)"
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 50:
+            return []
+        c = df["close"]
+        i = len(df) - 1
+        m = c.iloc[i - 40:i].mean(); s = c.iloc[i - 40:i].std()
+        if s <= 0:
+            return []
+        z = (c.iloc[i] - m) / s
+        if has_position:
+            return self._close(symbol, "z back to mean") if z < 0 else []
+        if z > 2.0:
+            return self._open(symbol, self, "z-score > +2 (overextended)")
+        return []
+
+
+class ShortCCI(_ShortBase):
+    """SHORT CCI > +150 (extreme overbought); cover < -100."""
+    key = "s_cci"
+    label = "Short CCI (overbought)"
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 30:
+            return []
+        h, l, c = df["high"], df["low"], df["close"]
+        tp = (h + l + c) / 3
+        i = len(df) - 1
+        m = tp.iloc[i - 20:i + 1].mean()
+        md = (tp.iloc[i - 20:i] - m).abs().mean()
+        v = (tp.iloc[i] - m) / (0.015 * md) if md > 0 else 0
+        if has_position:
+            return self._close(symbol, "CCI < -100") if v < -100 else []
+        if v > 150:
+            return self._open(symbol, self, "CCI > +150 (extreme overbought)")
+        return []
+
+
+class ShortStoch(_ShortBase):
+    """SHORT Stochastic %K > 80; cover < 20."""
+    key = "s_stoch"
+    label = "Short Stochastic"
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 20:
+            return []
+        h = df["high"].values; l = df["low"].values; c = df["close"].values
+        i = len(df) - 1
+        hh = h[i - 14:i].max(); ll = l[i - 14:i].min()
+        k = 100 * (c[i] - ll) / (hh - ll) if hh > ll else 50
+        if has_position:
+            return self._close(symbol, "stoch oversold") if k < 20 else []
+        if k > 80:
+            return self._open(symbol, self, "stochastic overbought (>80)")
+        return []
+
+
+class ShortRSIDiv(_ShortBase):
+    """BEARISH divergence: price higher high, RSI lower high -> short."""
+    key = "s_rsidiv"
+    label = "Short RSI Divergence"
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 70:
+            return []
+        r = _rsi(df["close"], 14)
+        h = df["high"].values
+        i = len(df) - 1
+        if has_position:
+            return self._close(symbol, "RSI < 40") if r.iloc[i] < 40 else []
+        hi_now = h[i - 5:i].max(); hi_prev = h[i - 25:i - 15].max()
+        i_now = i - 5 + int(np.argmax(h[i - 5:i]))
+        i_prev = i - 25 + int(np.argmax(h[i - 25:i - 15]))
+        if (hi_now > hi_prev and r.iloc[i_now] < r.iloc[i_prev]
+                and r.iloc[i] > 55):
+            return self._open(symbol, self, "bearish RSI divergence")
+        return []
+
+
+class ShortDonch(_ShortBase):
+    """SHORT a 20-bar LOW breakdown; cover on a 4x ATR trailing stop."""
+    key = "s_donch"
+    label = "Short Donchian Breakdown"
+    stop_pct = 0.05
+    target_pct = 0.20
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 45:
+            return []
+        l = df["low"].values; c = df["close"].values
+        i = len(df) - 1
+        atrv = self._atr(df, 20).iloc[i]
+        if has_position:
+            trail = df["close"].iloc[-15:].min() + 4.0 * atrv
+            return self._close(symbol, "4x ATR trail") if c[i] > trail else []
+        if c[i] < min(l[i - 20:i]):
+            return self._open(symbol, self, "20-bar low breakdown (short)")
+        return []
+
+
+class ShortSupertrend(_ShortBase):
+    """SHORT on the Supertrend flip DOWN."""
+    key = "s_super"
+    label = "Short Supertrend"
+    stop_pct = 0.03
+    target_pct = 0.06
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 40:
+            return []
+        a = self._atr(df, 10)
+        hl2 = (df["high"] + df["low"]) / 2
+        c = df["close"]
+        i = len(df) - 1
+        upper = hl2.iloc[i] + 3.0 * a.iloc[i]
+        lower_p = hl2.iloc[i - 1] - 3.0 * a.iloc[i - 1]
+        bear = c.iloc[i] < lower_p
+        bear_prev = c.iloc[i - 1] < (hl2.iloc[i - 2] - 3.0 * a.iloc[i - 2])
+        if has_position:
+            return self._close(symbol, "supertrend flipped up") if c.iloc[i] > upper else []
+        if bear and not bear_prev:
+            return self._open(symbol, self, "supertrend flipped down")
+        return []
+
+
+class ShortDualTF(_ShortBase):
+    """SHORT rallies (RSI>65) when the 200-EMA is FALLING."""
+    key = "s_dualtf"
+    label = "Short Dual-TF Rally"
+    stop_pct = 0.025
+    target_pct = 0.04
+
+    def on_candle(self, symbol, df, has_position=False):
+        if len(df) < 220:
+            return []
+        r = _rsi(df["close"], 14)
+        e200 = _ema(df["close"], 200)
+        i = len(df) - 1
+        c = df["close"].iloc[i]
+        if has_position:
+            if r.iloc[i] < 40 or c > e200.iloc[i]:
+                return self._close(symbol, "RSI low or trend flipped")
+            return []
+        falling = e200.iloc[i] < e200.iloc[i - 20]
+        if falling and r.iloc[i] > 65:
+            return self._open(symbol, self, "rally in a falling trend (short)")
+        return []
+
+
 # Map the sweep's method names to their strategy classes.
 _METHOD_MAP = {
     "Keltner": Keltner, "Stochastic": Stochastic, "WilliamsR": WilliamsR,
     "CryptoTrend": DonchTrend, "DonchTrend": DonchTrend, "RangeRSI": RangeRSI,
     "CCI": CCI, "Supertrend": Supertrend, "Aroon": Aroon,
     "ZScoreMR": ZScoreMR, "RSIdiverg": RSIDivergence, "BBSqueeze": BBSqueeze,
-    "InsideBar": InsideBar, "DualTF": DualTF, "ShortKeltner": ShortKeltner,
-    "ShortWilliams": ShortWilliams,
+    "InsideBar": InsideBar, "DualTF": DualTF,
+    # shorts
+    "ShortKeltner": ShortKeltner, "ShortWilliams": ShortWilliams,
+    "ShortZScore": ShortZScore, "ShortCCI": ShortCCI, "ShortStoch": ShortStoch,
+    "ShortRSIdiv": ShortRSIDiv, "ShortDonch": ShortDonch,
+    "ShortSupertrend": ShortSupertrend, "ShortDualTF": ShortDualTF,
 }
 
 import json as _json
