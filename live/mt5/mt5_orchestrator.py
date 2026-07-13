@@ -162,6 +162,10 @@ class Orchestrator:
         from mt5_regime import RegimeBrain
         self.regime = RegimeBrain(bridge)
         self.regime_on = os.getenv("MT5_REGIME", "1") == "1"
+        # Correlation guard: caps risk inside correlated groups (indices crash
+        # together — the drawdown a per-strategy backtest cannot see).
+        from mt5_correlation import CorrelationGuard
+        self.correlation = CorrelationGuard(bridge)
         # Book selection via MT5_BOOK (the clean 3-book architecture):
         #   "metals"    -> long-term gold/silver trend & breakout
         #   "shortterm" -> fast 15m/1h metals (+ day-trader limits if DAYTRADER)
@@ -303,6 +307,15 @@ class Orchestrator:
                         f"[{strat.key}] {our_symbol}: SKIP — portfolio risk "
                         f"would be {total_pct:.1f}% (> {MAX_PORTFOLIO_RISK_PCT:.0f}% "
                         f"cap across all books)")
+                    return True
+                # CORRELATION CAP — the rail the backtest can't see. Indices
+                # (and other correlated groups) crash TOGETHER; without this, a
+                # dozen "diversified" strategies all lose at once.
+                ok_c, why_c = self.correlation.allows(
+                    our_symbol, real_risk, real_equity,
+                    list(self.bridge.symbols.keys()))
+                if not ok_c:
+                    self._record(f"[{strat.key}] {our_symbol}: SKIP — {why_c}")
                     return True
         allowed, reason = self.governor.can_open(strat.key)
         if not allowed:
