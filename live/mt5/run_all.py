@@ -36,6 +36,7 @@ BOOKS = [
     dict(name="INDICES", book="v_indices", magic="770003", port="8803"),
     dict(name="ENERGY", book="v_energy", magic="770004", port="8804"),
     dict(name="CRYPTO", book="v_crypto", magic="770005", port="8805"),
+    dict(name="SOFTS", book="v_softs", magic="770006", port="8806"),
 ]
 
 

@@ -31,6 +31,7 @@ BOOKS = [
     {"key": "indices", "name": "INDICES", "url": "http://localhost:8803"},
     {"key": "energy", "name": "ENERGY", "url": "http://localhost:8804"},
     {"key": "crypto", "name": "CRYPTO", "url": "http://localhost:8805"},
+    {"key": "softs", "name": "SOFTS", "url": "http://localhost:8806"},
 ]
 
 
