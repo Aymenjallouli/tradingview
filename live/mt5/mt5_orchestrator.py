@@ -45,13 +45,18 @@ def _log(m):
 
 import os
 MAX_RISK_PCT = float(os.getenv("MT5_RISK_PCT", "1.5"))
-# Size trades as if the account were this big, not the demo's $100k. Set to 1000
-# so the P&L mirrors what a real $1000 account would do. 0 = use real equity.
-VIRTUAL_EQUITY = float(os.getenv("MT5_VIRTUAL_EQUITY", "1000"))
-# Raised so the system grabs MORE opportunities when signals cluster in one
-# sweep. Still risk-governed: 10 x 1.5% = up to 15% account risk deployed.
-MAX_POSITIONS_TOTAL = int(os.getenv("MT5_MAX_POS", "10"))
-MAX_POSITIONS_PER_STRATEGY = int(os.getenv("MT5_MAX_POS_STRAT", "5"))
+# Size off the REAL account balance (0 = use real equity). Previously a fake
+# $1000 "virtual equity" was used, which oversized trades once the balance fell.
+VIRTUAL_EQUITY = float(os.getenv("MT5_VIRTUAL_EQUITY", "0"))
+# RELIABILITY: cap simultaneous positions PER BOOK. With 5 books running, 3 each
+# = max 15 open, so total deployed risk stays ~15 x 2% = 30% worst case (and the
+# portfolio-risk guard below caps the real total). Fewer, better positions.
+MAX_POSITIONS_TOTAL = int(os.getenv("MT5_MAX_POS", "3"))
+MAX_POSITIONS_PER_STRATEGY = int(os.getenv("MT5_MAX_POS_STRAT", "2"))
+# HARD portfolio cap: total risk across ALL open positions (this book's + every
+# other book's) may not exceed this % of the account. This is the real
+# blow-up protection when several books fire at once.
+MAX_PORTFOLIO_RISK_PCT = float(os.getenv("MT5_MAX_PORTFOLIO_RISK", "10"))
 # Widened to 12% to match the aggressive 2-5%/trade sizing (a 5%/trade loss
 # would trip a 5% daily stop instantly). Still a HARD backstop: lose 12% in a
 # day and all new entries stop until tomorrow — so you can't nuke the account
@@ -280,6 +285,24 @@ class Orchestrator:
                     self._record(f"[{strat.key}] {our_symbol}: SKIP — min lot "
                                  f"risks {real_pct:.1f}% (> {cap:.0f}% cap); "
                                  f"instrument too big for ${real_equity:.0f} acct")
+                    return True
+                # PORTFOLIO RISK CAP — count open risk across EVERY book (all
+                # magics), not just this one. Five books firing at once must not
+                # stack past MAX_PORTFOLIO_RISK_PCT of the account.
+                open_risk = 0.0
+                for p in (mt5.positions_get() or []):
+                    pi = mt5.symbol_info(p.symbol)
+                    if not pi or not p.sl or not pi.trade_tick_size:
+                        continue
+                    open_risk += (abs(p.price_open - p.sl) / pi.trade_tick_size
+                                  * pi.trade_tick_value * p.volume)
+                total_pct = ((open_risk + real_risk) / real_equity * 100
+                             if real_equity else 99)
+                if total_pct > MAX_PORTFOLIO_RISK_PCT:
+                    self._record(
+                        f"[{strat.key}] {our_symbol}: SKIP — portfolio risk "
+                        f"would be {total_pct:.1f}% (> {MAX_PORTFOLIO_RISK_PCT:.0f}% "
+                        f"cap across all books)")
                     return True
         allowed, reason = self.governor.can_open(strat.key)
         if not allowed:
