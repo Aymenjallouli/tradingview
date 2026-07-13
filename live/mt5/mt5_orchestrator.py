@@ -242,9 +242,21 @@ class Orchestrator:
         tick = self.bridge.tick(our_symbol)
         if not broker or not tick:
             return
-        # REGIME FILTER: don't fight the daily trend (backtested — turned losing
-        # crypto strategies into winners). Longs need daily-up, shorts daily-down.
-        if self.regime_on:
+        # REGIME FILTER: only gate TREND-FOLLOWING strategies by the daily trend.
+        # MEAN-REVERSION strategies are SUPPOSED to fade extremes against the
+        # trend (a ShortCCI shorts an overbought spike even in an uptrend — that
+        # IS its validated edge), so applying the regime filter to them would
+        # block the exact trades the walk-forward validated. Trend strategies
+        # still respect it (don't buy a downtrend / short an uptrend).
+        MEAN_REVERSION = {
+            # long MR
+            "keltner", "stoch", "williams", "rangersi", "cci", "zscore",
+            "rsidiv", "bbsqueeze",
+            # short MR
+            "shortkelt", "shortwill", "s_zscore", "s_cci", "s_stoch",
+            "s_rsidiv",
+        }
+        if self.regime_on and strat.key not in MEAN_REVERSION:
             ok, why = self.regime.allows(our_symbol, intent["side"])
             if not ok:
                 self._record(f"[{strat.key}] {our_symbol}: SKIP — {why}")
