@@ -49,15 +49,21 @@ def _env(**overrides):
 def main():
     procs = []
     for b in BOOKS:
-        # RELIABILITY sizing: 1% (low conf) -> 2% (high conf).
-        # This is the single biggest lever for reliable results. Backtest on our
-        # own strategies: at 1% risk the max drawdown was 8%; at 8% risk it was
-        # 51% (and a 16-trade losing streak IS possible across the portfolio).
-        # Small risk = you survive the streaks = the edge actually gets to pay.
-        # Daily circuit breaker tightened to 6% to match.
+        # SIZING TUNED TO THE MIN-LOT REALITY of a small account.
+        # Measured on this $744 account: the broker's MINIMUM lot already risks
+        # 1.6-14% on most markets, so a tiny 0.5-0.9% cap would BLOCK 16 of 24
+        # markets (most strategies would never fire). A ~3% cap unlocks 18 of 24
+        # markets while still allowing ~6-10 concurrent positions inside the 12%
+        # portfolio cap. More MARKETS available matters more than more positions
+        # here — it's what lets the 169 strategies actually trade.
         env = _env(MT5_BOOK=b["book"], MT5_MAGIC=b["magic"],
                    MT5_DASH_PORT=b["port"],
-                   MT5_RISK_MIN="1.0", MT5_RISK_MAX="2.0",
+                   MT5_RISK_MIN="1.5", MT5_RISK_MAX="3.0",
+                   MT5_MAX_POS="4",              # per book (6 books -> up to 24)
+                   MT5_MAX_POS_STRAT="2",
+                   MT5_MAX_PORTFOLIO_RISK="12",  # total across ALL books
+                   MT5_MAX_GROUP_POS="3",        # per correlated group
+                   MT5_MAX_GROUP_RISK="5",
                    MT5_DAILY_STOP="0.06",
                    MT5_REGIME="1", MT5_GOLD_FOCUS="0",
                    MT5_DAYTRADER="0", MT5_PYRAMID="0")
