@@ -80,50 +80,51 @@ def _decimals(price):
 
 def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
                 label=None, reason="", lots=None, risk_usd=None,
-                timeframe=None, notional_usd=None, balance=None):
-    """Post a full new-entry signal: exact entry/SL/TP, position size (lots +
-    $ invested + $ risk), the $ profit if TP hits and the resulting balance,
-    reward:risk, confidence, and an estimated hold time."""
+                timeframe=None, notional_usd=None, balance=None,
+                profit_at_tp=None, loss_at_sl=None):
+    """Post a clean new-entry signal. profit_at_tp / loss_at_sl are the REAL
+    dollar amounts (computed from actual lots x tick value in the orchestrator)
+    — not derived, so they're accurate even on min-lot-forced trades."""
     emoji = "🟢" if side == "buy" else "🔴"
-    arrow = "LONG ▲ (buy)" if side == "buy" else "SHORT ▼ (sell)"
+    arrow = "BUY (long)" if side == "buy" else "SELL (short)"
     d = _decimals(price)
-    # reward:risk from the SL/TP distances
     risk_dist = abs(price - sl)
     rew_dist = abs(tp - price)
     rr = (rew_dist / risk_dist) if risk_dist > 0 else 0
     sl_pct = risk_dist / price * 100
     tp_pct = rew_dist / price * 100
-    # $ profit if TP hits = risk $ * reward:risk (same money mechanics)
-    profit_at_tp = (abs(risk_usd) * rr) if risk_usd is not None else None
-    loss_at_sl = abs(risk_usd) if risk_usd is not None else None
+    # Fallback if the caller didn't pass real $ amounts.
+    if profit_at_tp is None and risk_usd is not None:
+        profit_at_tp = abs(risk_usd) * rr
+    if loss_at_sl is None and risk_usd is not None:
+        loss_at_sl = abs(risk_usd)
 
-    lines = [f"{emoji} *SIGNAL — {symbol}*  {arrow}",
-             f"*Strategy:* {strategy}"]
+    lines = [f"{emoji} *{symbol}*  —  {arrow}",
+             f"📊 Strategy: {strategy}"]
     if confidence is not None:
-        lines.append(f"*Confidence:* {label or ''} ({confidence}/100)")
+        lines.append(f"🎯 Confidence: {label or ''} ({confidence}/100)")
     lines.append("")
-    lines.append(f"📍 *Entry:* `{price:.{d}f}`")
-    lines.append(f"🛑 *Stop-loss:* `{sl:.{d}f}`  (−{sl_pct:.2f}%)")
-    lines.append(f"🎯 *Take-profit:* `{tp:.{d}f}`  (+{tp_pct:.2f}%)")
-    lines.append(f"⚖️ *Reward:Risk:* {rr:.1f} : 1")
+    lines.append(f"Entry:  `{price:.{d}f}`")
+    lines.append(f"Stop:   `{sl:.{d}f}`   (−{sl_pct:.1f}%)")
+    lines.append(f"Target: `{tp:.{d}f}`   (+{tp_pct:.1f}%)")
+    lines.append(f"R:R  {rr:.1f} : 1")
     if lots is not None:
-        size = f"💰 *Buy:* {lots} lots"
-        if notional_usd is not None:
-            size += f"  (~${notional_usd:,.0f} position value)"
-        lines.append(size)
-    # --- the money math the user asked for ---
-    if profit_at_tp is not None:
+        lines.append(f"Size:  {lots} lots")
+    # The money math — REAL amounts, clearly framed.
+    if profit_at_tp is not None and loss_at_sl is not None:
         lines.append("")
-        lines.append(f"✅ *If TP hits:* +${profit_at_tp:,.2f}"
-                     + (f"  →  balance ${balance + profit_at_tp:,.2f}"
-                        if balance is not None else ""))
-        lines.append(f"❌ *If SL hits:* −${loss_at_sl:,.2f}"
-                     + (f"  →  balance ${balance - loss_at_sl:,.2f}"
-                        if balance is not None else ""))
+        wtxt = f"✅ If target hit:  *+${profit_at_tp:,.2f}*"
+        if balance is not None:
+            wtxt += f"  → ${balance + profit_at_tp:,.2f}"
+        ltxt = f"⛔ If stop hit:    *−${loss_at_sl:,.2f}*"
+        if balance is not None:
+            ltxt += f"  → ${balance - loss_at_sl:,.2f}"
+        lines.append(wtxt)
+        lines.append(ltxt)
     if timeframe:
-        est = _HOLD_ESTIMATE.get(timeframe, "varies")
-        lines.append(f"⏱️ *Est. hold:* {est}  ({timeframe} strategy)")
-    lines.append(f"\n_Why:_ {reason}")
+        lines.append(f"\n⏱️ Est. hold: {_HOLD_ESTIMATE.get(timeframe, 'varies')}")
+    if reason:
+        lines.append(f"_{reason}_")
     lines.append(DISCLAIMER)
     return _send("\n".join(lines))
 

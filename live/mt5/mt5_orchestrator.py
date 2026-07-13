@@ -301,24 +301,27 @@ class Orchestrator:
             self._last_conf[f"{strat.key}|{our_symbol}"] = {
                 "confidence": conf, "label": conviction.label(conf),
                 "agree": agree, "risk_pct": risk_pct}
-            # Push the full signal to Telegram (no-op if not configured):
-            # entry/SL/TP, size (lots + $ value), $ profit if TP / loss if SL,
-            # resulting balance, R:R, confidence, est. hold.
-            risk_usd = equity * (risk_pct / 100.0)
-            notional_usd = None
+            # Push the full signal to Telegram with the REAL $ amounts (computed
+            # from actual lots x tick value — accurate even on min-lot trades).
+            fill = res["price"]
+            profit_at_tp = loss_at_sl = None
+            balance = None
             if mt5 is not None:
                 info = mt5.symbol_info(broker)
-                if info and info.trade_contract_size:
-                    notional_usd = lots * info.trade_contract_size * res["price"]
-            snap = self.bridge.account_snapshot() or {}
-            balance = snap.get("balance")
+                snap = self.bridge.account_snapshot() or {}
+                balance = snap.get("balance")
+                if info and info.trade_tick_value and info.trade_tick_size:
+                    tv, ts = info.trade_tick_value, info.trade_tick_size
+                    profit_at_tp = abs(tp - fill) / ts * tv * lots
+                    loss_at_sl = abs(fill - sl) / ts * tv * lots
             telegram.post_signal(our_symbol, getattr(strat, "label", strat.key),
-                                 intent["side"], res["price"], sl, tp,
+                                 intent["side"], fill, sl, tp,
                                  confidence=conf, label=conviction.label(conf),
                                  reason=intent.get("reason", ""),
-                                 lots=lots, risk_usd=risk_usd,
+                                 lots=lots,
                                  timeframe=getattr(strat, "timeframe", None),
-                                 notional_usd=notional_usd, balance=balance)
+                                 balance=balance,
+                                 profit_at_tp=profit_at_tp, loss_at_sl=loss_at_sl)
             # Persistent trade journal (exact strategy per trade).
             tradelog.log_open(os.getenv("MT5_BOOK", "?"), strat.key, our_symbol,
                               intent["side"], lots, res["price"], sl, tp,
