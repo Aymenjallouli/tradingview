@@ -52,7 +52,8 @@
     "oos_pf": 2.1,
     "oos_n": 77,
     "oos_win": 71,
-    "trades_per_month": 6.5
+    "trades_per_month": 6.5,
+    "stop_pct": 0.02
   },
   {
     "symbol": "US500",
@@ -63,7 +64,8 @@
     "oos_pf": 1.96,
     "oos_n": 143,
     "oos_win": 72,
-    "trades_per_month": 2.8
+    "trades_per_month": 2.8,
+    "stop_pct": 0.0578
   },
   {
     "symbol": "GER40",
@@ -85,7 +87,8 @@
     "oos_pf": 1.93,
     "oos_n": 64,
     "oos_win": 67,
-    "trades_per_month": 5.2
+    "trades_per_month": 5.2,
+    "stop_pct": 0.02
   },
   {
     "symbol": "US100",
@@ -107,18 +110,8 @@
     "oos_pf": 1.91,
     "oos_n": 69,
     "oos_win": 75,
-    "trades_per_month": 1.6
-  },
-  {
-    "symbol": "US500",
-    "class": "indices",
-    "method": "RangeRSI",
-    "tf": "4h",
-    "is_pf": 1.35,
-    "oos_pf": 1.9,
-    "oos_n": 75,
-    "oos_win": 72,
-    "trades_per_month": 1.6
+    "trades_per_month": 1.6,
+    "stop_pct": 0.06
   },
   {
     "symbol": "GER40",
@@ -132,17 +125,6 @@
     "trades_per_month": 1.0
   },
   {
-    "symbol": "US500",
-    "class": "indices",
-    "method": "Keltner",
-    "tf": "4h",
-    "is_pf": 1.29,
-    "oos_pf": 1.83,
-    "oos_n": 75,
-    "oos_win": 69,
-    "trades_per_month": 1.5
-  },
-  {
     "symbol": "EURJPY",
     "class": "forex",
     "method": "WilliamsR",
@@ -151,7 +133,8 @@
     "oos_pf": 1.82,
     "oos_n": 137,
     "oos_win": 74,
-    "trades_per_month": 2.9
+    "trades_per_month": 2.9,
+    "stop_pct": 0.08
   },
   {
     "symbol": "XAUUSD",
@@ -173,7 +156,8 @@
     "oos_pf": 1.81,
     "oos_n": 149,
     "oos_win": 73,
-    "trades_per_month": 3.1
+    "trades_per_month": 3.1,
+    "stop_pct": 0.0623
   },
   {
     "symbol": "US500",
@@ -195,7 +179,8 @@
     "oos_pf": 1.76,
     "oos_n": 60,
     "oos_win": 82,
-    "trades_per_month": 1.3
+    "trades_per_month": 1.3,
+    "stop_pct": 0.08
   },
   {
     "symbol": "US100",
@@ -239,7 +224,8 @@
     "oos_pf": 1.7,
     "oos_n": 88,
     "oos_win": 75,
-    "trades_per_month": 1.7
+    "trades_per_month": 1.7,
+    "stop_pct": 0.06
   },
   {
     "symbol": "XAUUSD",
@@ -250,7 +236,8 @@
     "oos_pf": 1.68,
     "oos_n": 82,
     "oos_win": 76,
-    "trades_per_month": 6.5
+    "trades_per_month": 6.5,
+    "stop_pct": 0.03
   },
   {
     "symbol": "US100",
@@ -272,7 +259,8 @@
     "oos_pf": 1.46,
     "oos_n": 73,
     "oos_win": 73,
-    "trades_per_month": 1.5
+    "trades_per_month": 1.5,
+    "stop_pct": 0.02
   },
   {
     "symbol": "USDCAD",
@@ -283,7 +271,8 @@
     "oos_pf": 1.39,
     "oos_n": 147,
     "oos_win": 68,
-    "trades_per_month": 3.2
+    "trades_per_month": 3.2,
+    "stop_pct": 0.04
   },
   {
     "symbol": "ETHUSD",
@@ -338,7 +327,8 @@
     "oos_pf": 2.2,
     "oos_n": 74,
     "oos_win": 74,
-    "trades_per_month": 1.4
+    "trades_per_month": 1.4,
+    "stop_pct": 0.05
   },
   {
     "symbol": "JPN225",
@@ -349,7 +339,8 @@
     "oos_pf": 1.83,
     "oos_n": 59,
     "oos_win": 71,
-    "trades_per_month": 1.4
+    "trades_per_month": 1.4,
+    "stop_pct": 0.0697
   },
   {
     "symbol": "XAGUSD",
@@ -371,7 +362,8 @@
     "oos_pf": 1.68,
     "oos_n": 139,
     "oos_win": 73,
-    "trades_per_month": 2.9
+    "trades_per_month": 2.9,
+    "stop_pct": 0.0597
   },
   {
     "symbol": "UK100",
@@ -382,7 +374,8 @@
     "oos_pf": 1.66,
     "oos_n": 158,
     "oos_win": 74,
-    "trades_per_month": 12.9
+    "trades_per_month": 12.9,
+    "stop_pct": 0.03
   },
   {
     "symbol": "UK100",
@@ -393,7 +386,8 @@
     "oos_pf": 1.61,
     "oos_n": 158,
     "oos_win": 74,
-    "trades_per_month": 13.2
+    "trades_per_month": 13.2,
+    "stop_pct": 0.03
   },
   {
     "symbol": "COFFEE",
@@ -404,7 +398,8 @@
     "oos_pf": 1.6,
     "oos_n": 50,
     "oos_win": 70,
-    "trades_per_month": 1.5
+    "trades_per_month": 1.5,
+    "stop_pct": 0.0923
   },
   {
     "symbol": "COCOA",
@@ -437,7 +432,8 @@
     "oos_pf": 1.48,
     "oos_n": 152,
     "oos_win": 74,
-    "trades_per_month": 3.2
+    "trades_per_month": 3.2,
+    "stop_pct": 0.08
   },
   {
     "symbol": "JPN225",
@@ -448,7 +444,8 @@
     "oos_pf": 1.44,
     "oos_n": 144,
     "oos_win": 72,
-    "trades_per_month": 3.0
+    "trades_per_month": 3.0,
+    "stop_pct": 0.0704
   },
   {
     "symbol": "JPN225",
@@ -459,7 +456,8 @@
     "oos_pf": 1.42,
     "oos_n": 146,
     "oos_win": 64,
-    "trades_per_month": 12.3
+    "trades_per_month": 12.3,
+    "stop_pct": 0.08
   },
   {
     "symbol": "AUS200",
@@ -470,7 +468,8 @@
     "oos_pf": 1.39,
     "oos_n": 158,
     "oos_win": 72,
-    "trades_per_month": 3.2
+    "trades_per_month": 3.2,
+    "stop_pct": 0.0526
   },
   {
     "symbol": "USDNOK",
@@ -481,18 +480,8 @@
     "oos_pf": 1.38,
     "oos_n": 152,
     "oos_win": 70,
-    "trades_per_month": 3.1
-  },
-  {
-    "symbol": "US30",
-    "class": "indices",
-    "method": "Keltner",
-    "tf": "4h",
-    "is_pf": 1.28,
-    "oos_pf": 1.37,
-    "oos_n": 68,
-    "oos_win": 68,
-    "trades_per_month": 1.4
+    "trades_per_month": 3.1,
+    "stop_pct": 0.04
   },
   {
     "symbol": "EURGBP",
@@ -503,7 +492,8 @@
     "oos_pf": 1.35,
     "oos_n": 145,
     "oos_win": 63,
-    "trades_per_month": 3.0
+    "trades_per_month": 3.0,
+    "stop_pct": 0.04
   },
   {
     "symbol": "NZDUSD",
@@ -514,7 +504,8 @@
     "oos_pf": 1.35,
     "oos_n": 70,
     "oos_win": 64,
-    "trades_per_month": 1.5
+    "trades_per_month": 1.5,
+    "stop_pct": 0.05
   },
   {
     "symbol": "BRENT",
@@ -525,7 +516,8 @@
     "oos_pf": 1.34,
     "oos_n": 66,
     "oos_win": 68,
-    "trades_per_month": 6.1
+    "trades_per_month": 6.1,
+    "stop_pct": 0.05
   },
   {
     "symbol": "EURGBP",
@@ -536,7 +528,8 @@
     "oos_pf": 1.33,
     "oos_n": 147,
     "oos_win": 63,
-    "trades_per_month": 3.1
+    "trades_per_month": 3.1,
+    "stop_pct": 0.04
   },
   {
     "symbol": "GBPJPY",
@@ -547,7 +540,8 @@
     "oos_pf": 1.33,
     "oos_n": 58,
     "oos_win": 74,
-    "trades_per_month": 1.3
+    "trades_per_month": 1.3,
+    "stop_pct": 0.1
   },
   {
     "symbol": "CHFJPY",
@@ -558,7 +552,8 @@
     "oos_pf": 3.17,
     "oos_n": 88,
     "oos_win": 76,
-    "trades_per_month": 1.8
+    "trades_per_month": 1.8,
+    "stop_pct": 0.06
   },
   {
     "symbol": "CHFJPY",
@@ -569,7 +564,8 @@
     "oos_pf": 2.41,
     "oos_n": 57,
     "oos_win": 74,
-    "trades_per_month": 1.1
+    "trades_per_month": 1.1,
+    "stop_pct": 0.04
   },
   {
     "symbol": "USDCNH",
@@ -580,7 +576,8 @@
     "oos_pf": 2.11,
     "oos_n": 74,
     "oos_win": 76,
-    "trades_per_month": 1.4
+    "trades_per_month": 1.4,
+    "stop_pct": 0.03
   },
   {
     "symbol": "CHFJPY",
@@ -591,7 +588,8 @@
     "oos_pf": 1.96,
     "oos_n": 138,
     "oos_win": 72,
-    "trades_per_month": 2.8
+    "trades_per_month": 2.8,
+    "stop_pct": 0.06
   },
   {
     "symbol": "EURAUD",
@@ -602,7 +600,8 @@
     "oos_pf": 1.92,
     "oos_n": 74,
     "oos_win": 73,
-    "trades_per_month": 1.6
+    "trades_per_month": 1.6,
+    "stop_pct": 0.04
   },
   {
     "symbol": "EURCAD",
@@ -613,7 +612,8 @@
     "oos_pf": 1.75,
     "oos_n": 81,
     "oos_win": 67,
-    "trades_per_month": 1.9
+    "trades_per_month": 1.9,
+    "stop_pct": 0.02
   },
   {
     "symbol": "CHFJPY",
@@ -635,7 +635,8 @@
     "oos_pf": 1.59,
     "oos_n": 132,
     "oos_win": 65,
-    "trades_per_month": 3.0
+    "trades_per_month": 3.0,
+    "stop_pct": 0.05
   },
   {
     "symbol": "CADJPY",
@@ -646,7 +647,8 @@
     "oos_pf": 1.54,
     "oos_n": 67,
     "oos_win": 66,
-    "trades_per_month": 5.7
+    "trades_per_month": 5.7,
+    "stop_pct": 0.03
   },
   {
     "symbol": "EURCHF",
@@ -657,7 +659,8 @@
     "oos_pf": 1.43,
     "oos_n": 59,
     "oos_win": 75,
-    "trades_per_month": 1.3
+    "trades_per_month": 1.3,
+    "stop_pct": 0.04
   },
   {
     "symbol": "EURCHF",
@@ -668,7 +671,8 @@
     "oos_pf": 1.35,
     "oos_n": 63,
     "oos_win": 67,
-    "trades_per_month": 5.3
+    "trades_per_month": 5.3,
+    "stop_pct": 0.02
   },
   {
     "symbol": "EURCAD",
@@ -679,7 +683,8 @@
     "oos_pf": 1.3,
     "oos_n": 133,
     "oos_win": 63,
-    "trades_per_month": 3.1
+    "trades_per_month": 3.1,
+    "stop_pct": 0.02
   },
   {
     "symbol": "COCOA",
@@ -712,7 +717,8 @@
     "oos_pf": 1.6,
     "oos_n": 50,
     "oos_win": 70,
-    "trades_per_month": 1.5
+    "trades_per_month": 1.5,
+    "stop_pct": 0.0923
   },
   {
     "symbol": "COCOA",
@@ -745,7 +751,8 @@
     "oos_pf": 2.58,
     "oos_n": 81,
     "oos_win": 72,
-    "trades_per_month": 1.6
+    "trades_per_month": 1.6,
+    "stop_pct": 0.0717
   },
   {
     "symbol": "NAS100",
@@ -756,7 +763,8 @@
     "oos_pf": 2.37,
     "oos_n": 79,
     "oos_win": 75,
-    "trades_per_month": 1.6
+    "trades_per_month": 1.6,
+    "stop_pct": 0.0641
   },
   {
     "symbol": "NAS100",
@@ -767,7 +775,8 @@
     "oos_pf": 1.95,
     "oos_n": 142,
     "oos_win": 73,
-    "trades_per_month": 2.9
+    "trades_per_month": 2.9,
+    "stop_pct": 0.0782
   },
   {
     "symbol": "NAS100",
@@ -778,7 +787,8 @@
     "oos_pf": 1.8,
     "oos_n": 87,
     "oos_win": 75,
-    "trades_per_month": 1.8
+    "trades_per_month": 1.8,
+    "stop_pct": 0.1
   },
   {
     "symbol": "NAS100",
@@ -789,7 +799,8 @@
     "oos_pf": 1.77,
     "oos_n": 147,
     "oos_win": 71,
-    "trades_per_month": 3.0
+    "trades_per_month": 3.0,
+    "stop_pct": 0.0791
   },
   {
     "symbol": "NAS100",
@@ -800,7 +811,8 @@
     "oos_pf": 1.62,
     "oos_n": 103,
     "oos_win": 73,
-    "trades_per_month": 8.7
+    "trades_per_month": 8.7,
+    "stop_pct": 0.06
   },
   {
     "symbol": "NAS100",
@@ -866,7 +878,8 @@
     "oos_pf": 1.34,
     "oos_n": 66,
     "oos_win": 68,
-    "trades_per_month": 6.1
+    "trades_per_month": 6.1,
+    "stop_pct": 0.05
   },
   {
     "symbol": "NATGAS",
@@ -888,7 +901,8 @@
     "oos_n": 61,
     "oos_win": 75,
     "trades_per_month": 1.3,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.05
   },
   {
     "symbol": "JPN225",
@@ -899,7 +913,8 @@
     "oos_n": 67,
     "oos_win": 72,
     "trades_per_month": 1.3,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.0761
   },
   {
     "symbol": "NAS100",
@@ -910,7 +925,8 @@
     "oos_n": 69,
     "oos_win": 80,
     "trades_per_month": 1.4,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.0952
   },
   {
     "symbol": "US500",
@@ -921,7 +937,8 @@
     "oos_n": 65,
     "oos_win": 74,
     "trades_per_month": 1.3,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.0772
   },
   {
     "symbol": "COPPER",
@@ -932,7 +949,8 @@
     "oos_n": 63,
     "oos_win": 68,
     "trades_per_month": 1.3,
-    "class": "metals"
+    "class": "metals",
+    "stop_pct": 0.04
   },
   {
     "symbol": "NAS100",
@@ -943,7 +961,8 @@
     "oos_n": 61,
     "oos_win": 74,
     "trades_per_month": 1.2,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.0989
   },
   {
     "symbol": "FRA40",
@@ -954,7 +973,8 @@
     "oos_n": 56,
     "oos_win": 80,
     "trades_per_month": 1.4,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.03
   },
   {
     "symbol": "XAUUSD",
@@ -976,7 +996,8 @@
     "oos_n": 59,
     "oos_win": 78,
     "trades_per_month": 1.2,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.0664
   },
   {
     "symbol": "EURJPY",
@@ -987,18 +1008,8 @@
     "oos_n": 71,
     "oos_win": 83,
     "trades_per_month": 1.5,
-    "class": "forex"
-  },
-  {
-    "symbol": "JPN225",
-    "method": "ZScoreMR",
-    "tf": "4h",
-    "is_pf": 1.16,
-    "oos_pf": 2.11,
-    "oos_n": 56,
-    "oos_win": 73,
-    "trades_per_month": 1.3,
-    "class": "indices"
+    "class": "forex",
+    "stop_pct": 0.04
   },
   {
     "symbol": "GBPUSD",
@@ -1009,7 +1020,8 @@
     "oos_n": 70,
     "oos_win": 73,
     "trades_per_month": 1.5,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.04
   },
   {
     "symbol": "JPN225",
@@ -1020,7 +1032,8 @@
     "oos_n": 73,
     "oos_win": 75,
     "trades_per_month": 5.9,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.02
   },
   {
     "symbol": "US30",
@@ -1031,7 +1044,8 @@
     "oos_n": 61,
     "oos_win": 70,
     "trades_per_month": 5.7,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.04
   },
   {
     "symbol": "XAUUSD",
@@ -1042,7 +1056,8 @@
     "oos_n": 51,
     "oos_win": 69,
     "trades_per_month": 1.2,
-    "class": "metals"
+    "class": "metals",
+    "stop_pct": 0.1
   },
   {
     "symbol": "AUDUSD",
@@ -1053,7 +1068,8 @@
     "oos_n": 74,
     "oos_win": 66,
     "trades_per_month": 6.1,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "CHFJPY",
@@ -1075,7 +1091,8 @@
     "oos_n": 61,
     "oos_win": 66,
     "trades_per_month": 5.5,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.056
   },
   {
     "symbol": "GBPJPY",
@@ -1086,7 +1103,8 @@
     "oos_n": 63,
     "oos_win": 71,
     "trades_per_month": 5.5,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "US30",
@@ -1108,7 +1126,8 @@
     "oos_n": 60,
     "oos_win": 72,
     "trades_per_month": 5.3,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.0432
   },
   {
     "symbol": "XAUUSD",
@@ -1141,7 +1160,8 @@
     "oos_n": 68,
     "oos_win": 69,
     "trades_per_month": 1.5,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.03
   },
   {
     "symbol": "CHFJPY",
@@ -1152,7 +1172,8 @@
     "oos_n": 68,
     "oos_win": 69,
     "trades_per_month": 5.8,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "NAS100",
@@ -1174,7 +1195,8 @@
     "oos_n": 50,
     "oos_win": 72,
     "trades_per_month": 1.4,
-    "class": "softs"
+    "class": "softs",
+    "stop_pct": 0.05
   },
   {
     "symbol": "UK100",
@@ -1185,7 +1207,8 @@
     "oos_n": 59,
     "oos_win": 78,
     "trades_per_month": 5.2,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.02
   },
   {
     "symbol": "XAGUSD",
@@ -1240,7 +1263,8 @@
     "oos_n": 59,
     "oos_win": 66,
     "trades_per_month": 5.2,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "US500",
@@ -1251,7 +1275,8 @@
     "oos_n": 65,
     "oos_win": 62,
     "trades_per_month": 5.5,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.04
   },
   {
     "symbol": "GBPJPY",
@@ -1262,7 +1287,8 @@
     "oos_n": 67,
     "oos_win": 69,
     "trades_per_month": 5.6,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.04
   },
   {
     "symbol": "COPPER",
@@ -1273,7 +1299,8 @@
     "oos_n": 68,
     "oos_win": 74,
     "trades_per_month": 1.4,
-    "class": "metals"
+    "class": "metals",
+    "stop_pct": 0.06
   },
   {
     "symbol": "FRA40",
@@ -1284,7 +1311,8 @@
     "oos_n": 64,
     "oos_win": 69,
     "trades_per_month": 5.3,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.08
   },
   {
     "symbol": "GBPUSD",
@@ -1350,7 +1378,8 @@
     "oos_n": 67,
     "oos_win": 67,
     "trades_per_month": 1.4,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.1
   },
   {
     "symbol": "AUS200",
@@ -1361,7 +1390,8 @@
     "oos_n": 60,
     "oos_win": 73,
     "trades_per_month": 1.4,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.03
   },
   {
     "symbol": "US30",
@@ -1383,7 +1413,8 @@
     "oos_n": 63,
     "oos_win": 65,
     "trades_per_month": 1.4,
-    "class": "softs"
+    "class": "softs",
+    "stop_pct": 0.1
   },
   {
     "symbol": "GER40",
@@ -1438,7 +1469,8 @@
     "oos_pf": 1.3,
     "oos_n": 121,
     "oos_win": 74,
-    "trades_per_month": 25.0
+    "trades_per_month": 25.0,
+    "stop_pct": 0.02
   },
   {
     "symbol": "WHEAT",
@@ -1449,7 +1481,8 @@
     "oos_n": 76,
     "oos_win": 78,
     "trades_per_month": 1.5,
-    "class": "softs"
+    "class": "softs",
+    "stop_pct": 0.1
   },
   {
     "symbol": "WHEAT",
@@ -1460,7 +1493,8 @@
     "oos_n": 72,
     "oos_win": 83,
     "trades_per_month": 1.6,
-    "class": "softs"
+    "class": "softs",
+    "stop_pct": 0.1
   },
   {
     "symbol": "NATGAS",
@@ -1482,7 +1516,8 @@
     "oos_n": 80,
     "oos_win": 81,
     "trades_per_month": 1.5,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.1
   },
   {
     "symbol": "EURGBP",
@@ -1493,7 +1528,8 @@
     "oos_n": 86,
     "oos_win": 74,
     "trades_per_month": 18.3,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "EURCHF",
@@ -1504,7 +1540,8 @@
     "oos_n": 83,
     "oos_win": 72,
     "trades_per_month": 6.3,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "NZDUSD",
@@ -1515,7 +1552,8 @@
     "oos_n": 84,
     "oos_win": 79,
     "trades_per_month": 1.7,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.06
   },
   {
     "symbol": "AUS200",
@@ -1526,7 +1564,8 @@
     "oos_n": 78,
     "oos_win": 68,
     "trades_per_month": 6.6,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.03
   },
   {
     "symbol": "CORN",
@@ -1537,7 +1576,8 @@
     "oos_n": 54,
     "oos_win": 72,
     "trades_per_month": 1.7,
-    "class": "softs"
+    "class": "softs",
+    "stop_pct": 0.1
   },
   {
     "symbol": "AUDUSD",
@@ -1548,7 +1588,8 @@
     "oos_n": 79,
     "oos_win": 71,
     "trades_per_month": 1.6,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.08
   },
   {
     "symbol": "FRA40",
@@ -1559,7 +1600,8 @@
     "oos_n": 77,
     "oos_win": 73,
     "trades_per_month": 6.2,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.04
   },
   {
     "symbol": "EURGBP",
@@ -1570,7 +1612,8 @@
     "oos_n": 130,
     "oos_win": 68,
     "trades_per_month": 26.0,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "USDCAD",
@@ -1581,7 +1624,8 @@
     "oos_n": 168,
     "oos_win": 70,
     "trades_per_month": 30.0,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "EURCHF",
@@ -1592,7 +1636,8 @@
     "oos_n": 74,
     "oos_win": 70,
     "trades_per_month": 5.7,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "AUS200",
@@ -1603,7 +1648,8 @@
     "oos_n": 76,
     "oos_win": 72,
     "trades_per_month": 1.5,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.06
   },
   {
     "symbol": "EURCHF",
@@ -1614,7 +1660,8 @@
     "oos_n": 129,
     "oos_win": 72,
     "trades_per_month": 26.5,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "EURGBP",
@@ -1625,7 +1672,8 @@
     "oos_n": 159,
     "oos_win": 72,
     "trades_per_month": 33.7,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "BTCUSD",
@@ -1636,7 +1684,8 @@
     "oos_n": 257,
     "oos_win": 71,
     "trades_per_month": 49.9,
-    "class": "crypto"
+    "class": "crypto",
+    "stop_pct": 0.08
   },
   {
     "symbol": "WHEAT",
@@ -1647,7 +1696,8 @@
     "oos_n": 144,
     "oos_win": 63,
     "trades_per_month": 3.1,
-    "class": "softs"
+    "class": "softs",
+    "stop_pct": 0.1
   },
   {
     "symbol": "BTCUSD",
@@ -1658,7 +1708,8 @@
     "oos_n": 156,
     "oos_win": 68,
     "trades_per_month": 31.1,
-    "class": "crypto"
+    "class": "crypto",
+    "stop_pct": 0.02
   },
   {
     "symbol": "EURUSD",
@@ -1669,7 +1720,8 @@
     "oos_n": 64,
     "oos_win": 70,
     "trades_per_month": 5.5,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "FRA40",
@@ -1680,7 +1732,8 @@
     "oos_n": 105,
     "oos_win": 64,
     "trades_per_month": 8.5,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.06
   },
   {
     "symbol": "EURGBP",
@@ -1691,7 +1744,8 @@
     "oos_n": 147,
     "oos_win": 69,
     "trades_per_month": 3.1,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.1
   },
   {
     "symbol": "AUS200",
@@ -1702,7 +1756,8 @@
     "oos_n": 69,
     "oos_win": 67,
     "trades_per_month": 6.2,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.04
   },
   {
     "symbol": "EURGBP",
@@ -1713,7 +1768,8 @@
     "oos_n": 70,
     "oos_win": 70,
     "trades_per_month": 1.4,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "EURGBP",
@@ -1724,7 +1780,8 @@
     "oos_n": 98,
     "oos_win": 68,
     "trades_per_month": 2.0,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.1
   },
   {
     "symbol": "EURCHF",
@@ -1735,7 +1792,8 @@
     "oos_n": 160,
     "oos_win": 69,
     "trades_per_month": 13.1,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.03
   },
   {
     "symbol": "SOYBEANS",
@@ -1746,7 +1804,8 @@
     "oos_n": 94,
     "oos_win": 70,
     "trades_per_month": 2.0,
-    "class": "softs"
+    "class": "softs",
+    "stop_pct": 0.1
   },
   {
     "symbol": "AUDUSD",
@@ -1757,7 +1816,8 @@
     "oos_n": 65,
     "oos_win": 71,
     "trades_per_month": 1.4,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "USDCAD",
@@ -1768,7 +1828,8 @@
     "oos_n": 119,
     "oos_win": 66,
     "trades_per_month": 23.2,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "EURCHF",
@@ -1779,7 +1840,8 @@
     "oos_n": 51,
     "oos_win": 75,
     "trades_per_month": 1.0,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.03
   },
   {
     "symbol": "BTCUSD",
@@ -1790,7 +1852,8 @@
     "oos_n": 259,
     "oos_win": 68,
     "trades_per_month": 51.1,
-    "class": "crypto"
+    "class": "crypto",
+    "stop_pct": 0.08
   },
   {
     "symbol": "BTCUSD",
@@ -1812,7 +1875,8 @@
     "oos_n": 70,
     "oos_win": 69,
     "trades_per_month": 5.9,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.02
   },
   {
     "symbol": "NZDUSD",
@@ -1823,7 +1887,8 @@
     "oos_n": 67,
     "oos_win": 70,
     "trades_per_month": 1.4,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.04
   },
   {
     "symbol": "EURUSD",
@@ -1834,7 +1899,8 @@
     "oos_n": 100,
     "oos_win": 67,
     "trades_per_month": 2.0,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.08
   },
   {
     "symbol": "UK100",
@@ -1845,7 +1911,8 @@
     "oos_n": 78,
     "oos_win": 71,
     "trades_per_month": 6.4,
-    "class": "indices"
+    "class": "indices",
+    "stop_pct": 0.05
   },
   {
     "symbol": "EURCHF",
@@ -1856,6 +1923,7 @@
     "oos_n": 104,
     "oos_win": 62,
     "trades_per_month": 8.5,
-    "class": "forex"
+    "class": "forex",
+    "stop_pct": 0.03
   }
 ]

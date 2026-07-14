@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover
 
 import mt5_orders as orders
 import mt5_conviction as conviction
+import mt5_stops
 import mt5_telegram as telegram
 import mt5_tradelog as tradelog
 from mt5_strategies import (build_strategies, build_gold_focus_strategies,
@@ -166,6 +167,8 @@ class Orchestrator:
         from mt5_regime import RegimeBrain
         self.regime = RegimeBrain(bridge)
         self.regime_on = os.getenv("MT5_REGIME", "1") == "1"
+        # Self-heal stops on positions opened under the old flat-2% rule.
+        self._stop_fix_on = os.getenv("MT5_STOP_FIX", "1") == "1"
         # Correlation guard: caps risk inside correlated groups (indices crash
         # together — the drawdown a per-strategy backtest cannot see).
         from mt5_correlation import CorrelationGuard
@@ -284,13 +287,26 @@ class Orchestrator:
                 self._record(f"[{strat.key}] {our_symbol}: SKIP — {why}")
                 return True     # not a transient failure — wait for a new candle
         price = tick["ask"] if intent["side"] == "buy" else tick["bid"]
-        # SL/TP prices from the strategy's percentages (direction-aware).
+        # --- DATA-DERIVED STOP ----------------------------------------------
+        # These strategies were validated exiting on a SIGNAL with no stop. A
+        # flat 2% stop fires during the very dip a mean-reversion trade is built
+        # to buy, turning winners into losses (measured: it killed 16% of trades
+        # and cut avg PF from 1.53 to 1.32). Use each strategy-market's OWN
+        # measured adverse excursion instead. Still always a stop — just one
+        # sized to the market rather than to a round number.
+        stop_pct = mt5_stops.stop_for(strat.key, our_symbol, strat.timeframe,
+                                      intent["stop_pct"])
+        # Keep the reward side proportional so R:R doesn't collapse as the stop
+        # widens. The target is a safety ceiling anyway — 87% of these exit on
+        # a signal long before it — but it must stay reachable.
+        target_pct = max(intent["target_pct"], stop_pct * 1.5)
+        # SL/TP prices from those percentages (direction-aware).
         if intent["side"] == "buy":
-            sl = price * (1 - intent["stop_pct"])
-            tp = price * (1 + intent["target_pct"])
+            sl = price * (1 - stop_pct)
+            tp = price * (1 + target_pct)
         else:
-            sl = price * (1 + intent["stop_pct"])
-            tp = price * (1 - intent["target_pct"])
+            sl = price * (1 + stop_pct)
+            tp = price * (1 - target_pct)
         # --- CONVICTION SIZING ---------------------------------------------
         # Score this setup's confidence (strategy agreement + backtested edge +
         # trend alignment), then size risk between RISK_MIN and RISK_MAX.
@@ -453,6 +469,64 @@ class Orchestrator:
             entry.update(extra)
         self.scan[f"{strat_key}|{our_symbol}"] = entry
 
+    def _reconcile_stops(self, equity):
+        """Widen any open position still carrying a stop that's too tight.
+
+        Self-healing, because a stop can only be moved while the market is OPEN.
+        A position opened under the old flat-2% rule — or one whose market was
+        shut when we tried to fix it — would otherwise keep the very stop that
+        was converting winners into losses. Each scan we re-check and correct.
+
+        Only ever WIDENS, and never past the oversize cap: a wider stop means a
+        bigger loss if it's genuinely hit, so the risk it implies must still fit
+        the account. Positions already correct cost one comparison and no order.
+        """
+        if mt5 is None or not self._stop_fix_on:
+            return
+        # bridge.symbols maps our name -> broker name; we need the reverse.
+        ours = {v: k for k, v in self.bridge.symbols.items()}
+        for p in (mt5.positions_get() or []):
+            if p.magic != MAGIC or not p.sl or not p.price_open:
+                continue
+            key = (p.comment or "").strip().split()[0] if p.comment else ""
+            our_symbol = ours.get(p.symbol, p.symbol)
+            if not key:
+                continue
+            want = mt5_stops.stop_for(key, our_symbol, None, None)
+            if want is None:
+                continue
+            have = abs(p.price_open - p.sl) / p.price_open
+            if want <= have + 0.0005:          # already at/inside the right stop
+                continue
+            is_buy = p.type == mt5.POSITION_TYPE_BUY
+            otype = mt5.ORDER_TYPE_BUY if is_buy else mt5.ORDER_TYPE_SELL
+            # Shrink the widening until the implied risk fits the oversize cap.
+            new = want
+            while new > have:
+                sl = (p.price_open * (1 - new) if is_buy
+                      else p.price_open * (1 + new))
+                pr = mt5.order_calc_profit(otype, p.symbol, p.volume,
+                                           p.price_open, sl)
+                if pr is None:
+                    new = have
+                    break
+                if abs(pr) / equity * 100 <= OVERSIZE_CAP_PCT:
+                    break
+                new -= 0.005
+            if new <= have + 0.0005:
+                continue
+            digits = (mt5.symbol_info(p.symbol) or type("x", (), {"digits": 5})).digits
+            sl = (p.price_open * (1 - new) if is_buy
+                  else p.price_open * (1 + new))
+            tp = (p.price_open * (1 + new * 1.5) if is_buy
+                  else p.price_open * (1 - new * 1.5))
+            r = mt5.order_send({"action": mt5.TRADE_ACTION_SLTP,
+                                "position": p.ticket, "symbol": p.symbol,
+                                "sl": round(sl, digits), "tp": round(tp, digits)})
+            if r and r.retcode == mt5.TRADE_RETCODE_DONE:
+                self._record(f"[{key}] {our_symbol}: stop widened "
+                             f"{have*100:.1f}% -> {new*100:.1f}% (data-derived)")
+
     def _count_closed_trades(self):
         """Detect newly-closed OUR trades (bot-close OR broker SL/TP) and feed
         their P&L to the governor so the day-trader loss limit counts every
@@ -499,6 +573,8 @@ class Orchestrator:
         # Restrict to this bot's assigned markets (two-bot isolation).
         if ONLY_SYMBOLS:
             universe = [u for u in universe if u in ONLY_SYMBOLS]
+
+        self._reconcile_stops(equity)
 
         # --- First pass: count how many strategies signal each symbol this
         #     poll, so conviction sizing can reward AGREEMENT. Cheap: reuses the
