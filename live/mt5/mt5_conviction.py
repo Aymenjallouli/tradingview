@@ -1,91 +1,128 @@
 """
-mt5_conviction.py — confidence-based position sizing.
+mt5_conviction.py — size by MEASURED EDGE, not by how loud the signal is.
 
-NOT "guaranteed trades" (those do not exist — anyone promising them is lying).
-This is what real traders actually do: size UP on higher-confidence setups and
-DOWN on weak ones. Confidence is a 0-100 score built from honest, measurable
-factors — never a promise of a win.
+WHAT THIS USED TO DO, AND WHY IT WAS WRONG
+------------------------------------------
+The old score was 40% "strategy agreement" (several strategies firing the same
+symbol+direction at once), 30% a hardcoded table of profit factors from the
+backtests we later proved were overfit, and 20% trend alignment. We then bet up
+to 2x more on a high score.
 
-Confidence factors (add up, capped at 100):
-  * base .................................. 10   every signal starts here
-  * strategy agreement ................. 0-40   +20 per extra strategy signalling
-                                                the SAME symbol this poll (2 strats
-                                                agreeing = strong; 3+ = very strong)
-  * backtested edge of the market ...... 0-30   scaled by the market's Donchian/Trend
-                                                profit factor (Brent PF 2.88 -> high;
-                                                marginal PF ~1.1 -> low)
-  * trend alignment ....................... 20   price above its 200-EMA (with-trend)
+Agreement was tested over 19,399 replayed trades:
 
-Sizing maps confidence -> risk %:
-  * conf   0 .............. RISK_MIN_PCT (default 1.0%)
-  * conf 100 .............. RISK_MAX_PCT (default 2.5%)
-  * linear in between, then HARD-capped by RISK_MAX_PCT.
+    strategies agreeing     trades   win rate   expectancy
+    1 (alone)               13,291        70%     +0.033R
+    2                        4,188        68%     +0.033R
+    3                        1,472        63%     +0.007R
+    4+                         448        71%     +0.056R
 
-So the strongest setups (multiple strategies agree, strong market, with-trend)
-risk ~2.5% and the weakest lone signals risk ~1.0% — more behind the best odds,
-less behind the marginal ones. Still every trade has a broker SL/TP.
+    lift from agreement: -0.005R   t = -0.89   ->  NOISE
+
+Agreement predicts NOTHING. Worse, agreement means several strategies piling into
+the SAME symbol and direction — so sizing up on it concentrated risk into
+correlated bets for zero extra return. We were paying risk and buying nothing.
+
+WHAT ACTUALLY PREDICTS
+----------------------
+A strategy's own past edge forecasts its future edge. Split every strategy-market
+70% past / 30% unseen future:
+
+    correlation(past expectancy, future expectancy) = +0.425
+    ranked on the PAST, what they earned NEXT:
+        top quartile      +0.066R
+        flat (all)        +0.036R
+        bottom quartile   +0.030R
+    top quartile beats flat by +0.030R, t = +2.18  ->  REAL
+
+So we size on measured expectancy (strategy_quality.json), not on noise.
+
+THE CAP IS NOT TIMIDITY, IT IS ARITHMETIC
+-----------------------------------------
+The Kelly criterion — the mathematically optimal bet size for a given edge — puts
+the maximum safe bet for our measured edge at ~2% of equity. Bet more than Kelly
+and long-run growth turns NEGATIVE even while you win most of your trades. We
+size in 0.5-1.5% and hard-cap at KELLY_CAP_PCT, i.e. at or under half-Kelly,
+because Kelly assumes you know your win rate exactly and we only ESTIMATE ours.
+An 8-point error in that estimate — well inside our own confidence interval —
+is the difference between compounding and going to zero.
+
+Untested strategies (the trend methods, which this replay cannot score) get
+NEUTRAL risk. Unmeasured is not the same as good.
 """
 
+import json
 import os
 
-# AGGRESSIVE sizing (user choice): weak setups risk 2%, strongest 5%.
-# On $1000 that's ~$20 (low conf) to ~$50 (very high conf) per trade — and a
-# high-conf 2:1 winner is ~$100. The flip side: a few high-conf losers in a row
-# can draw the account down 15-20%. Tune via env MT5_RISK_MIN / MT5_RISK_MAX.
-RISK_MIN_PCT = float(os.getenv("MT5_RISK_MIN", "2.0"))
-RISK_MAX_PCT = float(os.getenv("MT5_RISK_MAX", "5.0"))
+RISK_MIN_PCT = float(os.getenv("MT5_RISK_MIN", "0.5"))
+RISK_MAX_PCT = float(os.getenv("MT5_RISK_MAX", "1.5"))
+# Hard ceiling. Kelly for our measured edge is ~2%; never exceed it, whatever
+# the score says. This is the line between compounding and ruin.
+KELLY_CAP_PCT = float(os.getenv("MT5_KELLY_CAP", "2.0"))
 
-# Backtested profit factors (cost-included, from the chat's backtests). Used to
-# score how strong the EDGE is on each market. Best available PF across the
-# strategies we ran. Unknown markets get a neutral 1.2.
-MARKET_EDGE = {
-    # energy — the standouts
-    "GASOLINE": 7.05, "BRENT": 2.88, "NATGAS": 2.60, "CRUDE": 2.10,
-    # indices / metals / softs
-    "JPN225": 3.41, "UK100": 2.70, "COPPER": 1.68, "XPTUSD": 1.34,
-    "COFFEE": 1.82, "SOYBEANS": 1.38, "WHEAT": 3.23,
-    # equities
-    "GOOGL": 10.77, "NFLX": 2.95, "AAPL": 2.62, "AMZN": 1.63, "META": 1.23,
-    "NVDA": 3.50, "AMD": 2.69, "INTC": 2.40, "MSFT": 1.36,
-    # metals / crypto
-    "XAGUSD": 3.11, "XAUUSD": 2.23, "BTCUSD": 3.00, "ETHUSD": 1.50,
+_PATH = os.path.join(os.path.dirname(__file__), "strategy_quality.json")
+try:
+    with open(_PATH) as f:
+        _QUALITY = json.load(f)          # "SYMBOL|Method|tf" -> expectancy in R
+except Exception:  # noqa: BLE001
+    _QUALITY = {}
+
+# Live strategy.key -> the method name used in the study.
+KEY_TO_METHOD = {
+    "zscore": "ZScoreMR", "s_zscore": "ShortZScore",
+    "keltner": "Keltner", "shortkelt": "ShortKeltner",
+    "stoch": "Stochastic", "s_stoch": "ShortStoch",
+    "williams": "WilliamsR", "shortwill": "ShortWilliams",
+    "rangersi": "RangeRSI",
+    "cci": "CCI", "s_cci": "ShortCCI",
+    "rsidiv": "RSIdiverg", "s_rsidiv": "ShortRSIdiv",
 }
-NEUTRAL_EDGE = 1.2
+
+_vals = sorted(_QUALITY.values())
 
 
-def edge_score(our_symbol):
-    """0-30 based on the market's backtested profit factor."""
-    pf = MARKET_EDGE.get(our_symbol, NEUTRAL_EDGE)
-    # PF 1.0 -> 0 pts, PF 3.0+ -> full 30 pts (clamped)
-    frac = max(0.0, min(1.0, (pf - 1.0) / 2.0))
-    return 30.0 * frac
+def _percentile_of(exp_r):
+    """Where this strategy's edge ranks among all measured strategies (0-1)."""
+    if not _vals:
+        return 0.5
+    below = sum(1 for v in _vals if v < exp_r)
+    return below / len(_vals)
 
 
-def confidence(our_symbol, agree_count, trend_aligned):
-    """Compute a 0-100 confidence score for a signal.
+def expectancy(strategy_key, our_symbol, timeframe):
+    """Measured edge in R for this strategy-market, or None if never measured."""
+    method = KEY_TO_METHOD.get(strategy_key)
+    if not method:
+        return None
+    return _QUALITY.get(f"{our_symbol}|{method}|{timeframe}")
 
-    agree_count   = how many strategies signalled this symbol THIS poll (>=1)
-    trend_aligned = bool, price above its 200-EMA (with the long trend)
+
+def confidence(strategy_key, our_symbol, timeframe):
+    """0-100: how strong this strategy's MEASURED edge is, vs all the others.
+
+    Not a probability of winning, and not a promise. It is a ranking of edge.
+    An unmeasured strategy scores 50 — neutral, because we do not know.
     """
-    score = 10.0                                   # base
-    score += min(40.0, 20.0 * max(0, agree_count - 1))   # agreement
-    score += edge_score(our_symbol)                # backtested edge
-    if trend_aligned:
-        score += 20.0                              # with-trend
-    return round(min(100.0, score), 1)
+    exp_r = expectancy(strategy_key, our_symbol, timeframe)
+    if exp_r is None:
+        return 50.0
+    return round(100.0 * _percentile_of(exp_r), 1)
 
 
 def risk_pct_for(conf):
-    """Map a 0-100 confidence score to a risk %, hard-capped at RISK_MAX_PCT."""
+    """Map the 0-100 edge ranking to a risk %, hard-capped at Kelly."""
     r = RISK_MIN_PCT + (RISK_MAX_PCT - RISK_MIN_PCT) * (conf / 100.0)
-    return round(min(RISK_MAX_PCT, max(RISK_MIN_PCT, r)), 3)
+    return round(min(KELLY_CAP_PCT, max(RISK_MIN_PCT, r)), 3)
 
 
 def label(conf):
     if conf >= 75:
-        return "VERY HIGH"
+        return "TOP EDGE"
     if conf >= 55:
-        return "HIGH"
+        return "STRONG"
     if conf >= 35:
-        return "MEDIUM"
-    return "LOW"
+        return "AVERAGE"
+    return "WEAK"
+
+
+def loaded():
+    return len(_QUALITY)
