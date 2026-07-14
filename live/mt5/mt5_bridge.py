@@ -164,7 +164,14 @@ class MT5Bridge:
         if mt5 is None:
             _log("MetaTrader5 package not installed (pip install MetaTrader5).")
             return False
-        if not mt5.initialize():
+        # On Windows, initialize() auto-finds the running terminal. Under Wine
+        # (the Linux VPS) it can't always, so allow pointing it at the exact
+        # terminal64.exe via MT5_TERMINAL_PATH. Unset on Windows -> unchanged.
+        _init_kwargs = {}
+        _tpath = os.getenv("MT5_TERMINAL_PATH")
+        if _tpath:
+            _init_kwargs["path"] = _tpath
+        if not mt5.initialize(**_init_kwargs):
             _log(f"initialize() failed: {mt5.last_error()}. "
                  "Is the MT5 terminal running and logged in?")
             return False

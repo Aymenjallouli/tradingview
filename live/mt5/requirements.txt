@@ -1,0 +1,9 @@
+# Trading system dependencies. Everything else the code uses is stdlib.
+# numpy/pandas are pinned to versions known to run cleanly under Wine
+# (numpy 2.x has had Wine issues; 1.26.4 is rock-solid). pandas 2.2.2 works
+# with numpy 1.26.4.
+MetaTrader5
+numpy==1.26.4
+pandas==2.2.2
+fastapi
+uvicorn
