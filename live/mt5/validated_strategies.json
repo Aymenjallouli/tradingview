@@ -1048,18 +1048,6 @@
     "stop_pct": 0.04
   },
   {
-    "symbol": "XAUUSD",
-    "method": "ZScoreMR",
-    "tf": "4h",
-    "is_pf": 1.25,
-    "oos_pf": 1.86,
-    "oos_n": 51,
-    "oos_win": 69,
-    "trades_per_month": 1.2,
-    "class": "metals",
-    "stop_pct": 0.1
-  },
-  {
     "symbol": "AUDUSD",
     "method": "ZScoreMR",
     "tf": "1h",
@@ -1520,18 +1508,6 @@
     "stop_pct": 0.1
   },
   {
-    "symbol": "EURGBP",
-    "method": "ShortKeltner",
-    "tf": "15m",
-    "is_pf": 1.1,
-    "oos_pf": 2.04,
-    "oos_n": 86,
-    "oos_win": 74,
-    "trades_per_month": 18.3,
-    "class": "forex",
-    "stop_pct": 0.02
-  },
-  {
     "symbol": "EURCHF",
     "method": "ShortRSIdiv",
     "tf": "1h",
@@ -1604,18 +1580,6 @@
     "stop_pct": 0.04
   },
   {
-    "symbol": "EURGBP",
-    "method": "ShortRSIdiv",
-    "tf": "15m",
-    "is_pf": 1.14,
-    "oos_pf": 1.7,
-    "oos_n": 130,
-    "oos_win": 68,
-    "trades_per_month": 26.0,
-    "class": "forex",
-    "stop_pct": 0.02
-  },
-  {
     "symbol": "USDCAD",
     "method": "ShortRSIdiv",
     "tf": "15m",
@@ -1650,30 +1614,6 @@
     "trades_per_month": 1.5,
     "class": "indices",
     "stop_pct": 0.06
-  },
-  {
-    "symbol": "EURCHF",
-    "method": "ShortZScore",
-    "tf": "15m",
-    "is_pf": 1.99,
-    "oos_pf": 1.52,
-    "oos_n": 129,
-    "oos_win": 72,
-    "trades_per_month": 26.5,
-    "class": "forex",
-    "stop_pct": 0.02
-  },
-  {
-    "symbol": "EURGBP",
-    "method": "ShortCCI",
-    "tf": "15m",
-    "is_pf": 1.37,
-    "oos_pf": 1.51,
-    "oos_n": 159,
-    "oos_win": 72,
-    "trades_per_month": 33.7,
-    "class": "forex",
-    "stop_pct": 0.02
   },
   {
     "symbol": "BTCUSD",
@@ -1784,18 +1724,6 @@
     "stop_pct": 0.1
   },
   {
-    "symbol": "EURCHF",
-    "method": "ShortWilliams",
-    "tf": "1h",
-    "is_pf": 1.17,
-    "oos_pf": 1.42,
-    "oos_n": 160,
-    "oos_win": 69,
-    "trades_per_month": 13.1,
-    "class": "forex",
-    "stop_pct": 0.03
-  },
-  {
     "symbol": "SOYBEANS",
     "method": "ShortCCI",
     "tf": "4h",
@@ -1816,18 +1744,6 @@
     "oos_n": 65,
     "oos_win": 71,
     "trades_per_month": 1.4,
-    "class": "forex",
-    "stop_pct": 0.02
-  },
-  {
-    "symbol": "USDCAD",
-    "method": "ShortKeltner",
-    "tf": "15m",
-    "is_pf": 1.15,
-    "oos_pf": 1.38,
-    "oos_n": 119,
-    "oos_win": 66,
-    "trades_per_month": 23.2,
     "class": "forex",
     "stop_pct": 0.02
   },
