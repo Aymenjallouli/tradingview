@@ -171,18 +171,6 @@
     "trades_per_month": 1.1
   },
   {
-    "symbol": "EURJPY",
-    "class": "forex",
-    "method": "Keltner",
-    "tf": "4h",
-    "is_pf": 1.82,
-    "oos_pf": 1.76,
-    "oos_n": 60,
-    "oos_win": 82,
-    "trades_per_month": 1.3,
-    "stop_pct": 0.08
-  },
-  {
     "symbol": "US100",
     "class": "indices",
     "method": "Stochastic",
@@ -438,18 +426,6 @@
   {
     "symbol": "JPN225",
     "class": "indices",
-    "method": "WilliamsR",
-    "tf": "4h",
-    "is_pf": 1.12,
-    "oos_pf": 1.44,
-    "oos_n": 144,
-    "oos_win": 72,
-    "trades_per_month": 3.0,
-    "stop_pct": 0.0704
-  },
-  {
-    "symbol": "JPN225",
-    "class": "indices",
     "method": "Stochastic",
     "tf": "1h",
     "is_pf": 1.13,
@@ -472,18 +448,6 @@
     "stop_pct": 0.0526
   },
   {
-    "symbol": "USDNOK",
-    "class": "forex",
-    "method": "Stochastic",
-    "tf": "4h",
-    "is_pf": 1.11,
-    "oos_pf": 1.38,
-    "oos_n": 152,
-    "oos_win": 70,
-    "trades_per_month": 3.1,
-    "stop_pct": 0.04
-  },
-  {
     "symbol": "EURGBP",
     "class": "forex",
     "method": "WilliamsR",
@@ -494,18 +458,6 @@
     "oos_win": 63,
     "trades_per_month": 3.0,
     "stop_pct": 0.04
-  },
-  {
-    "symbol": "NZDUSD",
-    "class": "forex",
-    "method": "RangeRSI",
-    "tf": "4h",
-    "is_pf": 1.61,
-    "oos_pf": 1.35,
-    "oos_n": 70,
-    "oos_win": 64,
-    "trades_per_month": 1.5,
-    "stop_pct": 0.05
   },
   {
     "symbol": "BRENT",
@@ -554,18 +506,6 @@
     "oos_win": 76,
     "trades_per_month": 1.8,
     "stop_pct": 0.06
-  },
-  {
-    "symbol": "CHFJPY",
-    "class": "forex",
-    "method": "Keltner",
-    "tf": "4h",
-    "is_pf": 1.71,
-    "oos_pf": 2.41,
-    "oos_n": 57,
-    "oos_win": 74,
-    "trades_per_month": 1.1,
-    "stop_pct": 0.04
   },
   {
     "symbol": "USDCNH",
@@ -649,18 +589,6 @@
     "oos_win": 66,
     "trades_per_month": 5.7,
     "stop_pct": 0.03
-  },
-  {
-    "symbol": "EURCHF",
-    "class": "forex",
-    "method": "Keltner",
-    "tf": "4h",
-    "is_pf": 1.34,
-    "oos_pf": 1.43,
-    "oos_n": 59,
-    "oos_win": 75,
-    "trades_per_month": 1.3,
-    "stop_pct": 0.04
   },
   {
     "symbol": "EURCHF",
@@ -1071,18 +999,6 @@
     "class": "forex"
   },
   {
-    "symbol": "JPN225",
-    "method": "ZScoreMR",
-    "tf": "1h",
-    "is_pf": 1.24,
-    "oos_pf": 1.81,
-    "oos_n": 61,
-    "oos_win": 66,
-    "trades_per_month": 5.5,
-    "class": "indices",
-    "stop_pct": 0.056
-  },
-  {
     "symbol": "GBPJPY",
     "method": "RSIdiverg",
     "tf": "1h",
@@ -1187,18 +1103,6 @@
     "stop_pct": 0.05
   },
   {
-    "symbol": "UK100",
-    "method": "ZScoreMR",
-    "tf": "1h",
-    "is_pf": 1.31,
-    "oos_pf": 1.5,
-    "oos_n": 59,
-    "oos_win": 78,
-    "trades_per_month": 5.2,
-    "class": "indices",
-    "stop_pct": 0.02
-  },
-  {
     "symbol": "XAGUSD",
     "method": "BBSqueeze",
     "tf": "4h",
@@ -1267,18 +1171,6 @@
     "stop_pct": 0.04
   },
   {
-    "symbol": "GBPJPY",
-    "method": "ZScoreMR",
-    "tf": "1h",
-    "is_pf": 1.55,
-    "oos_pf": 1.41,
-    "oos_n": 67,
-    "oos_win": 69,
-    "trades_per_month": 5.6,
-    "class": "forex",
-    "stop_pct": 0.04
-  },
-  {
     "symbol": "COPPER",
     "method": "RSIdiverg",
     "tf": "4h",
@@ -1289,18 +1181,6 @@
     "trades_per_month": 1.4,
     "class": "metals",
     "stop_pct": 0.06
-  },
-  {
-    "symbol": "FRA40",
-    "method": "RSIdiverg",
-    "tf": "1h",
-    "is_pf": 1.27,
-    "oos_pf": 1.4,
-    "oos_n": 64,
-    "oos_win": 69,
-    "trades_per_month": 5.3,
-    "class": "indices",
-    "stop_pct": 0.08
   },
   {
     "symbol": "GBPUSD",
@@ -1628,18 +1508,6 @@
     "stop_pct": 0.08
   },
   {
-    "symbol": "WHEAT",
-    "method": "ShortWilliams",
-    "tf": "4h",
-    "is_pf": 1.28,
-    "oos_pf": 1.48,
-    "oos_n": 144,
-    "oos_win": 63,
-    "trades_per_month": 3.1,
-    "class": "softs",
-    "stop_pct": 0.1
-  },
-  {
     "symbol": "BTCUSD",
     "method": "ShortCCI",
     "tf": "15m",
@@ -1698,18 +1566,6 @@
     "trades_per_month": 6.2,
     "class": "indices",
     "stop_pct": 0.04
-  },
-  {
-    "symbol": "EURGBP",
-    "method": "ShortZScore",
-    "tf": "4h",
-    "is_pf": 1.26,
-    "oos_pf": 1.43,
-    "oos_n": 70,
-    "oos_win": 70,
-    "trades_per_month": 1.4,
-    "class": "forex",
-    "stop_pct": 0.02
   },
   {
     "symbol": "EURGBP",
@@ -1807,18 +1663,6 @@
     "stop_pct": 0.04
   },
   {
-    "symbol": "EURUSD",
-    "method": "ShortCCI",
-    "tf": "4h",
-    "is_pf": 1.42,
-    "oos_pf": 1.32,
-    "oos_n": 100,
-    "oos_win": 67,
-    "trades_per_month": 2.0,
-    "class": "forex",
-    "stop_pct": 0.08
-  },
-  {
     "symbol": "UK100",
     "method": "ShortZScore",
     "tf": "1h",
@@ -1829,17 +1673,5 @@
     "trades_per_month": 6.4,
     "class": "indices",
     "stop_pct": 0.05
-  },
-  {
-    "symbol": "EURCHF",
-    "method": "ShortCCI",
-    "tf": "1h",
-    "is_pf": 1.63,
-    "oos_pf": 1.3,
-    "oos_n": 104,
-    "oos_win": 62,
-    "trades_per_month": 8.5,
-    "class": "forex",
-    "stop_pct": 0.03
   }
 ]
