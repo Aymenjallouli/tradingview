@@ -57,6 +57,10 @@ MAX_POSITIONS_PER_STRATEGY = int(os.getenv("MT5_MAX_POS_STRAT", "2"))
 # other book's) may not exceed this % of the account. This is the real
 # blow-up protection when several books fire at once.
 MAX_PORTFOLIO_RISK_PCT = float(os.getenv("MT5_MAX_PORTFOLIO_RISK", "10"))
+# An instrument whose MINIMUM lot risks more than this % of the account can't be
+# sized safely at all — skip it entirely. Separate from the per-trade risk so
+# that tightening risk doesn't delist markets whose min-lot is still fine.
+OVERSIZE_CAP_PCT = float(os.getenv("MT5_OVERSIZE_CAP", "2.0"))
 # Widened to 12% to match the aggressive 2-5%/trade sizing (a 5%/trade loss
 # would trip a 5% daily stop instantly). Still a HARD backstop: lose 12% in a
 # day and all new entries stop until tomorrow — so you can't nuke the account
@@ -294,9 +298,13 @@ class Orchestrator:
                 real_equity = ((self.bridge.account_snapshot() or {})
                                .get("balance") or equity)
                 real_pct = real_risk / real_equity * 100 if real_equity else 99
-                # cap against the ACTUAL max conviction risk (e.g. 8%), + a
-                # little tolerance. Above this, the min-lot is simply too big.
-                cap = conviction.RISK_MAX_PCT * 1.2
+                # Oversize guard: reject an instrument whose MINIMUM lot risks
+                # more than OVERSIZE_CAP_PCT of the account (it simply can't be
+                # sized safely). Kept separate from the conviction max so that
+                # tightening per-trade risk doesn't silently delist markets
+                # whose min-lot is still perfectly safe (e.g. on a $6.7k account
+                # gold's min-lot is 1.2% — fine, even though target risk is 1%).
+                cap = OVERSIZE_CAP_PCT
                 if real_pct > cap:
                     self._record(f"[{strat.key}] {our_symbol}: SKIP — min lot "
                                  f"risks {real_pct:.1f}% (> {cap:.0f}% cap); "

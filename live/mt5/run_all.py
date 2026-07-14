@@ -49,22 +49,24 @@ def _env(**overrides):
 def main():
     procs = []
     for b in BOOKS:
-        # SIZING TUNED TO THE MIN-LOT REALITY of a small account.
-        # Measured on this $744 account: the broker's MINIMUM lot already risks
-        # 1.6-14% on most markets, so a tiny 0.5-0.9% cap would BLOCK 16 of 24
-        # markets (most strategies would never fire). A ~3% cap unlocks 18 of 24
-        # markets while still allowing ~6-10 concurrent positions inside the 12%
-        # portfolio cap. More MARKETS available matters more than more positions
-        # here — it's what lets the 169 strategies actually trade.
+        # SIZING FOR THE $6.7k ACCOUNT.
+        # The min-lot constraint that strangled the $743 account is gone: the
+        # broker's minimum lot now risks ~0.4% (was ~2%), so ALL 33 markets are
+        # tradeable and we can size by choice rather than by the broker's floor.
+        # 0.5-1% per trade inside a 12% portfolio cap -> ~15-20 concurrent
+        # positions, so most of the ~30 daily signals from the 169 strategies
+        # actually fill. This sizing survives the 16-trade losing streak the
+        # walk-forward found (worst case ~-16%, not account death).
         env = _env(MT5_BOOK=b["book"], MT5_MAGIC=b["magic"],
                    MT5_DASH_PORT=b["port"],
-                   MT5_RISK_MIN="1.5", MT5_RISK_MAX="3.0",
-                   MT5_MAX_POS="4",              # per book (6 books -> up to 24)
+                   MT5_RISK_MIN="0.5", MT5_RISK_MAX="1.0",
+                   MT5_OVERSIZE_CAP="2.0",       # min-lot must fit under 2%
+                   MT5_MAX_POS="5",              # per book (6 books -> up to 30)
                    MT5_MAX_POS_STRAT="2",
                    MT5_MAX_PORTFOLIO_RISK="12",  # total across ALL books
-                   MT5_MAX_GROUP_POS="3",        # per correlated group
-                   MT5_MAX_GROUP_RISK="5",
-                   MT5_DAILY_STOP="0.06",
+                   MT5_MAX_GROUP_POS="4",        # per correlated group
+                   MT5_MAX_GROUP_RISK="4",
+                   MT5_DAILY_STOP="0.05",
                    MT5_REGIME="1", MT5_GOLD_FOCUS="0",
                    MT5_DAYTRADER="0", MT5_PYRAMID="0")
         procs.append(subprocess.Popen([PY, "-u", "mt5_dashboard.py", *DRY],
