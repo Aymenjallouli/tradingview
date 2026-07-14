@@ -23,6 +23,7 @@ Stop: Ctrl+C.
 
 import os
 import sys
+import time
 import subprocess
 import signal
 
@@ -46,42 +47,53 @@ def _env(**overrides):
     return e
 
 
+def _book_env(b):
+    """The environment for one book. Sizing for the $6.7k account.
+
+    The min-lot constraint that strangled the $743 account is gone: the broker's
+    minimum lot now risks ~0.4% (was ~2%), so all markets are tradeable and we
+    size by choice, not by the broker's floor. Risk 0.5-1.5% (edge-weighted:
+    proven strategies get more, marginal ones less) inside a 12% portfolio cap
+    and hard-capped at 2% (Kelly for our measured edge). Survives the 16-trade
+    losing streak the walk-forward found (worst case ~-16%, not account death).
+    """
+    return _env(MT5_BOOK=b["book"], MT5_MAGIC=b["magic"],
+                MT5_DASH_PORT=b["port"],
+                MT5_RISK_MIN="0.5", MT5_RISK_MAX="1.5",
+                MT5_KELLY_CAP="2.0",          # hard ceiling, whatever the score
+                MT5_OVERSIZE_CAP="2.0",       # min-lot must fit under 2%
+                MT5_MAX_POS="5",              # per book (6 books -> up to 30)
+                MT5_MAX_POS_STRAT="2",
+                MT5_MAX_PORTFOLIO_RISK="12",  # total across ALL books
+                MT5_MAX_GROUP_POS="4",        # per correlated group
+                MT5_MAX_GROUP_RISK="4",
+                MT5_DAILY_STOP="0.05",
+                MT5_REGIME="1", MT5_GOLD_FOCUS="0",
+                MT5_DAYTRADER="0", MT5_PYRAMID="0")
+
+
+def _launch(b):
+    return subprocess.Popen([PY, "-u", "mt5_dashboard.py", *DRY],
+                            cwd=HERE, env=_book_env(b))
+
+
 def main():
-    procs = []
-    for b in BOOKS:
-        # SIZING FOR THE $6.7k ACCOUNT.
-        # The min-lot constraint that strangled the $743 account is gone: the
-        # broker's minimum lot now risks ~0.4% (was ~2%), so ALL 33 markets are
-        # tradeable and we can size by choice rather than by the broker's floor.
-        # 0.5-1% per trade inside a 12% portfolio cap -> ~15-20 concurrent
-        # positions, so most of the ~30 daily signals from the 169 strategies
-        # actually fill. This sizing survives the 16-trade losing streak the
-        # walk-forward found (worst case ~-16%, not account death).
-        env = _env(MT5_BOOK=b["book"], MT5_MAGIC=b["magic"],
-                   MT5_DASH_PORT=b["port"],
-                   MT5_RISK_MIN="0.5", MT5_RISK_MAX="1.0",
-                   MT5_OVERSIZE_CAP="2.0",       # min-lot must fit under 2%
-                   MT5_MAX_POS="5",              # per book (6 books -> up to 30)
-                   MT5_MAX_POS_STRAT="2",
-                   MT5_MAX_PORTFOLIO_RISK="12",  # total across ALL books
-                   MT5_MAX_GROUP_POS="4",        # per correlated group
-                   MT5_MAX_GROUP_RISK="4",
-                   MT5_DAILY_STOP="0.05",
-                   MT5_REGIME="1", MT5_GOLD_FOCUS="0",
-                   MT5_DAYTRADER="0", MT5_PYRAMID="0")
-        procs.append(subprocess.Popen([PY, "-u", "mt5_dashboard.py", *DRY],
-                                      cwd=HERE, env=env))
+    # book name -> live process. Supervised: if one dies, it is relaunched.
+    procs = {b["name"]: _launch(b) for b in BOOKS}
 
     print("=" * 62)
-    print(" FIVE VALIDATED BOOKS RUNNING (isolated by magic):")
+    print(" SIX VALIDATED BOOKS RUNNING (isolated by magic, SUPERVISED):")
     for b in BOOKS:
         print(f"   {b['name']:9} -> http://localhost:{b['port']}")
     print(" All walk-forward validated · every trade journaled to trades_log.csv")
-    print(" Then: python mt5_hub.py  (unified :8800)")
+    print(" A book that crashes is auto-restarted. Then: python mt5_hub.py (:8800)")
     print("=" * 62)
 
+    running = {"on": True}
+
     def _stop(*_):
-        for p in procs:
+        running["on"] = False
+        for p in procs.values():
             try:
                 p.terminate()
             except Exception:  # noqa: BLE001
@@ -90,8 +102,23 @@ def main():
 
     signal.signal(signal.SIGINT, _stop)
     signal.signal(signal.SIGTERM, _stop)
-    for p in procs:
-        p.wait()
+
+    # WATCHDOG: the whole point of "keep it running." A book can die from a
+    # transient MT5 disconnect, a candle-feed hiccup, or an unhandled edge case.
+    # Without this it stays dead and silently stops trading. Poll every 15s and
+    # relaunch anything that exited, so the system self-heals unattended.
+    fails = {b["name"]: 0 for b in BOOKS}
+    while running["on"]:
+        time.sleep(15)
+        for b in BOOKS:
+            p = procs[b["name"]]
+            if p.poll() is None:
+                fails[b["name"]] = 0            # healthy this cycle
+                continue
+            fails[b["name"]] += 1
+            print(f"[watchdog] {b['name']} exited (code {p.returncode}); "
+                  f"restart #{fails[b['name']]}", flush=True)
+            procs[b["name"]] = _launch(b)
 
 
 if __name__ == "__main__":
