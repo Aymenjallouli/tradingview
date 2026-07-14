@@ -246,6 +246,24 @@ class Orchestrator:
         tick = self.bridge.tick(our_symbol)
         if not broker or not tick:
             return
+        # ONE POSITION PER SYMBOL+DIRECTION (across ALL books).
+        # Two strategies agreeing on the same trade is a stronger signal, not a
+        # reason to open it twice: duplicates share an identical entry/stop, so
+        # they're one trade at double size while the risk system counts them as
+        # two independent bets. Conviction sizing already expresses agreement
+        # through SIZE (the "N strats agree" term), so express it there, not by
+        # stacking positions. The correlation cap can't catch this — it groups
+        # by correlated MARKETS and never considers the same market twice.
+        if mt5 is not None:
+            want = (mt5.ORDER_TYPE_BUY if intent["side"] == "buy"
+                    else mt5.ORDER_TYPE_SELL)
+            for p in (mt5.positions_get(symbol=broker) or []):
+                if p.type == want:
+                    self._record(
+                        f"[{strat.key}] {our_symbol}: SKIP — already "
+                        f"{intent['side']} {broker} (opened by "
+                        f"'{p.comment}'); one position per symbol+direction")
+                    return True
         # REGIME FILTER: only gate TREND-FOLLOWING strategies by the daily trend.
         # MEAN-REVERSION strategies are SUPPOSED to fade extremes against the
         # trend (a ShortCCI shorts an overbought spike even in an uptrend — that
