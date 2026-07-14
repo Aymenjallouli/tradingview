@@ -124,6 +124,7 @@ HTML = r"""
   tr:last-child td{border-bottom:none}
   .tag{font-size:9px;padding:2px 6px;border-radius:5px;font-weight:700}
   .t-sig{background:#00ff9c22;color:var(--green)}
+  .t-acted{background:#ffcf3a22;color:var(--amber)}
   .t-hold{background:#4dd2ff22;color:var(--blue)}.t-wait{background:#5a7d7018;color:var(--muted)}
   .pill{font-size:9px;color:var(--muted);border:1px solid var(--line);border-radius:20px;
     padding:2px 8px;display:inline-block;margin:1px}
@@ -167,20 +168,20 @@ function drawRadar(cv,scan,sweepRef){
   ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(CX+Math.cos(sweep)*R,CY+Math.sin(sweep)*R);ctx.stroke();
   const seen={};
   (scan||[]).forEach(x=>{
-    const rank=s=>s==='SIGNAL'?3:s==='holding'?2:1;
+    const rank=s=>s==='SIGNAL'?4:s==='acted'?3:s==='holding'?2:1;
     if(seen[x.symbol]&&rank(seen[x.symbol].status)>=rank(x.status))return;
     seen[x.symbol]=x;
   });
   const now=performance.now();
   Object.values(seen).forEach(x=>{
-    let dist=x.status==='SIGNAL'?0.88:x.status==='holding'?0.66:
+    let dist=x.status==='SIGNAL'?0.88:x.status==='acted'?0.75:x.status==='holding'?0.66:
       (x.distance!=null?Math.max(0.2,Math.min(0.8,0.8-x.distance/10)):0.5);
     let hsh=0;for(let c of x.symbol)hsh=(hsh*31+c.charCodeAt(0))%360;
     const ang=hsh*Math.PI/180, px=CX+Math.cos(ang)*R*dist, py=CY+Math.sin(ang)*R*dist;
     if(x.status==='SIGNAL'){const pl=0.5+0.5*Math.sin(now/200);
       ctx.fillStyle=`rgba(0,255,156,${0.6+0.4*pl})`;ctx.beginPath();ctx.arc(px,py,4*DPR,0,7);ctx.fill();
       ctx.strokeStyle=`rgba(0,255,156,${pl})`;ctx.beginPath();ctx.arc(px,py,(7+pl*6)*DPR,0,7);ctx.stroke();
-    }else{ctx.fillStyle=x.status==='holding'?'#4dd2ff':'#2b6b4d';
+    }else{ctx.fillStyle=x.status==='acted'?'#ffcf3a':x.status==='holding'?'#4dd2ff':'#2b6b4d';
       ctx.beginPath();ctx.arc(px,py,3*DPR,0,7);ctx.fill();}
     if(x.status!=='waiting'){ctx.fillStyle=x.status==='SIGNAL'?'#aeffda':'#6fae95';
       ctx.font=`${9*DPR}px monospace`;ctx.fillText(x.symbol,px+6*DPR,py+3*DPR);}
@@ -213,7 +214,7 @@ async function tick(){
       <td class="${cls(p.profit)}">${p.profit>=0?'+':''}${fmt(p.profit)}</td>
       <td class="muted">${p.strategy||''}</td></tr>`).join(''):'<tr><td colspan="4" class="empty">no positions</td></tr>';
     const scanRows=(bk.scan||[]).slice(0,6).map(x=>{
-      const tg=x.status==='SIGNAL'?'t-sig':x.status==='holding'?'t-hold':'t-wait';
+      const tg=x.status==='SIGNAL'?'t-sig':x.status==='acted'?'t-acted':x.status==='holding'?'t-hold':'t-wait';
       let d=x.distance!=null?(x.distance<=0?'HIT':'+'+fmt(x.distance)+'%'):'—';
       return `<tr><td class="muted">${x.strategy}</td><td><b>${x.symbol}</b></td>
         <td><span class="tag ${tg}">${x.status}</span></td><td>${d}</td></tr>`;}).join('');

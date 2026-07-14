@@ -571,8 +571,13 @@ class Orchestrator:
                 for it in intents:
                     if it["type"] == "open":
                         if self._last_bar.get(bar_key) == closed_time:
-                            self._scan_set(strat.key, our_symbol, "SIGNAL",
-                                           "signal (already acted this candle)",
+                            # The entry CONDITION is still true (it stays true
+                            # for the rest of the candle), but we already acted
+                            # on it. Reporting this as "SIGNAL" made the
+                            # dashboard look like it was ignoring opportunities.
+                            # Give it its own status so the UI tells the truth.
+                            self._scan_set(strat.key, our_symbol, "acted",
+                                           "already acted this candle",
                                            extra={"distance": dist})
                             continue
                         # Only mark the candle as "acted" if the order actually
@@ -608,7 +613,7 @@ class Orchestrator:
         ours = orders.open_positions()
         # Sort the scan so signals + near-misses float to the top.
         def _rank(s):
-            order = {"SIGNAL": 0, "holding": 1, "waiting": 2,
+            order = {"SIGNAL": 0, "acted": 1, "holding": 1, "waiting": 2,
                      "no-data": 3}.get(s.get("status"), 4)
             d = s.get("distance")
             return (order, d if d is not None else 999)

@@ -115,6 +115,7 @@ HTML = r"""
   .up{color:var(--green)} .down{color:var(--red)} .muted{color:var(--muted)}
   .tag{font-size:9px;padding:2px 7px;border-radius:5px;font-weight:700;letter-spacing:.5px}
   .t-sig{background:#00ff9c22;color:var(--green);box-shadow:0 0 12px #00ff9c33}
+  .t-acted{background:#ffcf3a22;color:var(--amber)}
   .t-hold{background:#4dd2ff22;color:var(--blue)}
   .t-wait{background:#5a7d7018;color:var(--muted)}
   .log{max-height:280px;overflow:auto;font-size:11px;line-height:1.7}
@@ -253,7 +254,7 @@ function drawRadar(){
     const age=(now-(b.ping||0));
     const lit=age<900;
     const pr=lit?(1-age/900):0;
-    let color=b.status==='SIGNAL'?'#00ff9c':b.status==='holding'?'#4dd2ff':'#2b6b4d';
+    let color=b.status==='SIGNAL'?'#00ff9c':b.status==='acted'?'#ffcf3a':b.status==='holding'?'#4dd2ff':'#2b6b4d';
     if(b.status==='SIGNAL'){
       // signals always glow + pulse
       const pl=0.5+0.5*Math.sin(now/200);
@@ -270,7 +271,7 @@ function drawRadar(){
       ctx.beginPath(); ctx.arc(x,y,(4+ (1-pr)*16)*DPR,0,7); ctx.stroke();
     }
     // label for signals / holdings
-    if(b.status==='SIGNAL'||b.status==='holding'||lit){
+    if(b.status!=='waiting'||lit){
       ctx.fillStyle=b.status==='SIGNAL'?'#aeffda':'#6fae95';
       ctx.font=`${10*DPR}px ui-monospace,monospace`;
       ctx.fillText(b.label, x+7*DPR, y+3*DPR);
@@ -297,6 +298,7 @@ function updateBlips(scan){
     // distance: closer to a breakout => closer to the EDGE (more urgent).
     let dist=0.55;
     if(x.status==='SIGNAL') dist=0.9;
+    else if(x.status==='acted') dist=0.78;
     else if(x.status==='holding') dist=0.7;
     else if(x.distance!=null){ dist=Math.max(0.2,Math.min(0.85,0.85-(x.distance/10))); }
     // stable angle per symbol (hash)
@@ -353,7 +355,7 @@ async function tick(){
 
   // scan (signals + nearest first — already sorted server-side)
   $('#scan').innerHTML = scan.slice(0,14).map(x=>{
-    const t=x.status==='SIGNAL'?'t-sig':x.status==='holding'?'t-hold':'t-wait';
+    const t=x.status==='SIGNAL'?'t-sig':x.status==='acted'?'t-acted':x.status==='holding'?'t-hold':'t-wait';
     let d='—';
     if(x.distance!=null) d=x.distance<=0?'<span class="up">HIT</span>':'+'+fmt(x.distance)+'%';
     return `<tr><td class="muted">${x.strategy}</td><td><b>${x.symbol}</b></td>
