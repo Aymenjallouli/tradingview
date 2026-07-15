@@ -34,7 +34,12 @@ if [ -n "${MT5_LOGIN:-}" ]; then
   sleep 3
 fi
 
-# 4) the supervised books (this call blocks and self-heals its children).
+# 4) the unified dashboard on :8800 (aggregates all 6 books). Background it so
+# the books can start; expose it with a Cloudflare tunnel to view remotely.
+echo "[start] launching dashboard hub on :8800"
+( cd "$APP_DIR" && wpy mt5_hub.py ) &>/dev/null &
+
+# 5) the supervised books (this call blocks and self-heals its children).
 # NB: wpy is a shell function, so it can't be exec'd (exec needs an external
 # command) — call it directly and let this script stay as the service's parent.
 echo "[start] launching the 6 books"
