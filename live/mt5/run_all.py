@@ -68,11 +68,18 @@ def _book_env(b):
                 MT5_RISK_MIN="0.5", MT5_RISK_MAX="1.5",
                 MT5_KELLY_CAP="2.0",          # hard ceiling, whatever the score
                 MT5_OVERSIZE_CAP="2.0",       # min-lot must fit under 2%
-                MT5_MAX_POS="5",              # per book (6 books -> up to 30)
-                MT5_MAX_POS_STRAT="2",
-                MT5_MAX_PORTFOLIO_RISK="12",  # total across ALL books
-                MT5_MAX_GROUP_POS="4",        # per correlated group
-                MT5_MAX_GROUP_RISK="4",
+                # "OPEN AS MANY AS DIVERSIFICATION ALLOWS." The safe way to run
+                # more positions is not a bigger per-trade bet (Kelly caps that
+                # at 2%) but MORE concurrent, UNCORRELATED bets. So the per-book
+                # and portfolio caps are loosened, while the two rails that keep
+                # it safe stay put: the 2% Kelly cap per trade, and the
+                # correlation cap (<=4 positions / <=4% risk in any one cluster,
+                # so 12 "diversified" indices can't secretly be one 12% bet).
+                MT5_MAX_POS="12",             # per book (was 5)
+                MT5_MAX_POS_STRAT="3",
+                MT5_MAX_PORTFOLIO_RISK="20",  # total across ALL books (was 12)
+                MT5_MAX_GROUP_POS="4",        # per correlated group (unchanged)
+                MT5_MAX_GROUP_RISK="4",       # per correlated group (unchanged)
                 MT5_DAILY_STOP="0.05",
                 MT5_REGIME="1", MT5_GOLD_FOCUS="0",
                 MT5_DAYTRADER="0", MT5_PYRAMID="0")

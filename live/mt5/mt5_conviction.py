@@ -79,6 +79,15 @@ KEY_TO_METHOD = {
 
 _vals = sorted(_QUALITY.values())
 
+# Out-of-sample stats per strategy-market (win rate, PF, sample size), for the
+# human-facing signal card. Loaded once.
+_VPATH = os.path.join(os.path.dirname(__file__), "validated_strategies.json")
+try:
+    with open(_VPATH) as f:
+        _V = {f"{r['symbol']}|{r['method']}|{r['tf']}": r for r in json.load(f)}
+except Exception:  # noqa: BLE001
+    _V = {}
+
 
 def _percentile_of(exp_r):
     """Where this strategy's edge ranks among all measured strategies (0-1)."""
@@ -106,6 +115,41 @@ def confidence(strategy_key, our_symbol, timeframe):
     if exp_r is None:
         return 50.0
     return round(100.0 * _percentile_of(exp_r), 1)
+
+
+def signal_stats(strategy_key, our_symbol, timeframe):
+    """Rich, human-facing confidence for a signal card. Returns a dict:
+    conf (0-100), win_rate (0-1|None), edge_r (R|None), pf, n, label.
+
+    Distinct from confidence() above, which drives SIZING off edge rank ALONE
+    (validated: edge predicts future edge, agreement predicts nothing). This is
+    what a person reading a signal actually wants: it blends the edge rank with
+    the out-of-sample WIN RATE and discounts small samples. So it answers three
+    honest questions at once — how often did it win, how big is the edge, and
+    how much history stands behind it.
+
+        conf = (0.55 * edge_rank  +  0.45 * win_score)  *  sample_trust
+        win_score  = (win% - 50) / 35, clamped 0..1   (50%->0, 85%->1)
+        sample_trust = 0.75 + 0.25 * min(1, n/60)      (small n -> gentle haircut)
+
+    Unmeasured (trend) strategies: neutral edge rank, win rate from the
+    validation record if present. "Unmeasured" is shown honestly, never faked.
+    """
+    method = KEY_TO_METHOD.get(strategy_key)
+    key = f"{our_symbol}|{method}|{timeframe}" if method else None
+    edge_r = _QUALITY.get(key) if key else None
+    rec = _V.get(key) if key else None
+    win = (rec["oos_win"] / 100.0) if rec and rec.get("oos_win") is not None else None
+    pf = rec.get("oos_pf") if rec else None
+    n = rec.get("oos_n") if rec else None
+
+    edge_rank = _percentile_of(edge_r) if edge_r is not None else 0.5
+    win_score = 0.5 if win is None else max(0.0, min(1.0, (win - 0.50) / 0.35))
+    trust = 1.0 if not n else max(0.0, min(1.0, n / 60.0))
+    conf = round(100.0 * (0.55 * edge_rank + 0.45 * win_score)
+                 * (0.75 + 0.25 * trust), 1)
+    return {"conf": conf, "win_rate": win, "edge_r": edge_r, "pf": pf,
+            "n": n, "label": label(conf)}
 
 
 def risk_pct_for(conf):

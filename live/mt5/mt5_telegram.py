@@ -81,10 +81,14 @@ def _decimals(price):
 def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
                 label=None, reason="", lots=None, risk_usd=None,
                 timeframe=None, notional_usd=None, balance=None,
-                profit_at_tp=None, loss_at_sl=None):
-    """Post a clean new-entry signal. profit_at_tp / loss_at_sl are the REAL
-    dollar amounts (computed from actual lots x tick value in the orchestrator)
-    — not derived, so they're accurate even on min-lot-forced trades."""
+                profit_at_tp=None, loss_at_sl=None,
+                win_rate=None, edge_r=None, n=None,
+                taken=True, skip_reason=None):
+    """Post a clean signal card. profit_at_tp / loss_at_sl are the REAL dollar
+    amounts (actual lots x tick value) so they're accurate even on min-lot
+    trades. win_rate / edge_r / n are the out-of-sample track record behind the
+    signal. taken=False marks a WATCHLIST signal the sim account didn't take
+    (skip_reason says why) — still a real, tradeable setup for a bigger account."""
     emoji = "🟢" if side == "buy" else "🔴"
     arrow = "BUY (long)" if side == "buy" else "SELL (short)"
     d = _decimals(price)
@@ -93,16 +97,26 @@ def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
     rr = (rew_dist / risk_dist) if risk_dist > 0 else 0
     sl_pct = risk_dist / price * 100
     tp_pct = rew_dist / price * 100
-    # Fallback if the caller didn't pass real $ amounts.
     if profit_at_tp is None and risk_usd is not None:
         profit_at_tp = abs(risk_usd) * rr
     if loss_at_sl is None and risk_usd is not None:
         loss_at_sl = abs(risk_usd)
 
-    lines = [f"{emoji} *{symbol}*  —  {arrow}",
-             f"📊 Strategy: {strategy}"]
+    head = (f"{emoji} *{symbol}*  —  {arrow}" if taken
+            else f"👀 *WATCHLIST — {symbol}*  —  {arrow}")
+    lines = [head, f"📊 Strategy: {strategy}"]
     if confidence is not None:
-        lines.append(f"🎯 Confidence: {label or ''} ({confidence}/100)")
+        lines.append(f"🎯 Confidence: *{label or ''}* ({confidence}/100)")
+    # The track record behind the signal — the honest basis for the confidence.
+    tr = []
+    if win_rate is not None:
+        tr.append(f"win {win_rate*100:.0f}%")
+    if edge_r is not None:
+        tr.append(f"edge {edge_r:+.3f}R")
+    if n:
+        tr.append(f"n={n}")
+    if tr:
+        lines.append("📈 Track record: " + " · ".join(tr))
     lines.append("")
     lines.append(f"Entry:  `{price:.{d}f}`")
     lines.append(f"Stop:   `{sl:.{d}f}`   (−{sl_pct:.1f}%)")
@@ -110,7 +124,6 @@ def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
     lines.append(f"R:R  {rr:.1f} : 1")
     if lots is not None:
         lines.append(f"Size:  {lots} lots")
-    # The money math — REAL amounts, clearly framed.
     if profit_at_tp is not None and loss_at_sl is not None:
         lines.append("")
         wtxt = f"✅ If target hit:  *+${profit_at_tp:,.2f}*"
@@ -121,8 +134,14 @@ def post_signal(symbol, strategy, side, price, sl, tp, confidence=None,
             ltxt += f"  → ${balance - loss_at_sl:,.2f}"
         lines.append(wtxt)
         lines.append(ltxt)
+        # Expected value per trade — the number that actually matters long-run.
+        if edge_r is not None and loss_at_sl:
+            lines.append(f"📐 Expected: *{edge_r*loss_at_sl:+,.2f}* per trade "
+                         f"(edge × risk)")
     if timeframe:
         lines.append(f"\n⏱️ Est. hold: {_HOLD_ESTIMATE.get(timeframe, 'varies')}")
+    if not taken and skip_reason:
+        lines.append(f"\n⏸️ _Sim ($2k) skipped: {skip_reason}._")
     if reason:
         lines.append(f"_{reason}_")
     lines.append(DISCLAIMER)

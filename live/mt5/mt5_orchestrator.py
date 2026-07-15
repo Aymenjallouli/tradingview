@@ -235,6 +235,10 @@ class Orchestrator:
         self.poll_count = 0
         self._agree_count = {}     # symbol -> #strategies signalling this poll
         self._last_conf = {}       # "strat|symbol" -> confidence info of a fill
+        # Telegram: notify EVERY new signal once (taken or watch-listed).
+        self._notified = set()     # (strat, symbol, candle_time) already posted
+        self._skip_reason = None   # why the last _execute_open didn't fill
+        self._sig_plan = None      # the priced plan of the last signal (for alerts)
 
     def _record(self, msg):
         _log(msg)
@@ -254,6 +258,10 @@ class Orchestrator:
         tick = self.bridge.tick(our_symbol)
         if not broker or not tick:
             return
+        # Reset the signal-outcome capture (read by the scan loop to notify
+        # Telegram of every signal — taken or watch-listed — exactly once).
+        self._skip_reason = None
+        self._sig_plan = None
         # ONE POSITION PER SYMBOL+DIRECTION (across ALL books).
         # Two strategies agreeing on the same trade is a stronger signal, not a
         # reason to open it twice: duplicates share an identical entry/stop, so
@@ -335,6 +343,15 @@ class Orchestrator:
             if info and info.trade_tick_value and info.trade_tick_size:
                 real_risk = (abs(price - sl) / info.trade_tick_size
                              * info.trade_tick_value * lots)
+                # Now that the trade is fully priced, stash the plan so the scan
+                # loop can post it to Telegram even if a risk cap below skips it
+                # (a watch-list signal — real and tradeable for a bigger acct).
+                self._sig_plan = {
+                    "side": intent["side"], "entry": price, "sl": sl, "tp": tp,
+                    "lots": lots, "loss_at_sl": real_risk,
+                    "profit_at_tp": abs(tp - price) / info.trade_tick_size
+                    * info.trade_tick_value * lots,
+                    "reason": intent.get("reason", "")}
                 # For a faithful small-account SIMULATION, judge the min-lot and
                 # portfolio caps against the VIRTUAL balance too. Otherwise the
                 # real (larger) demo balance would admit markets a real $2k
@@ -352,6 +369,9 @@ class Orchestrator:
                 # gold's min-lot is 1.2% — fine, even though target risk is 1%).
                 cap = OVERSIZE_CAP_PCT
                 if real_pct > cap:
+                    self._skip_reason = (f"min lot risks {real_pct:.1f}% "
+                                         f"(> {cap:.0f}% cap) — too big for "
+                                         f"${real_equity:.0f}")
                     self._record(f"[{strat.key}] {our_symbol}: SKIP — min lot "
                                  f"risks {real_pct:.1f}% (> {cap:.0f}% cap); "
                                  f"instrument too big for ${real_equity:.0f} acct")
@@ -369,6 +389,9 @@ class Orchestrator:
                 total_pct = ((open_risk + real_risk) / real_equity * 100
                              if real_equity else 99)
                 if total_pct > MAX_PORTFOLIO_RISK_PCT:
+                    self._skip_reason = (f"portfolio at capacity "
+                                         f"({total_pct:.0f}% > "
+                                         f"{MAX_PORTFOLIO_RISK_PCT:.0f}% cap)")
                     self._record(
                         f"[{strat.key}] {our_symbol}: SKIP — portfolio risk "
                         f"would be {total_pct:.1f}% (> {MAX_PORTFOLIO_RISK_PCT:.0f}% "
@@ -381,10 +404,12 @@ class Orchestrator:
                     our_symbol, real_risk, real_equity,
                     list(self.bridge.symbols.keys()))
                 if not ok_c:
+                    self._skip_reason = why_c
                     self._record(f"[{strat.key}] {our_symbol}: SKIP — {why_c}")
                     return True
         allowed, reason = self.governor.can_open(strat.key)
         if not allowed:
+            self._skip_reason = reason
             self._record(f"[{strat.key}] {our_symbol}: BLOCKED — {reason}")
             return True          # governor block — wait for a new candle
         exp_r = conviction.expectancy(strat.key, our_symbol, strat.timeframe)
@@ -418,14 +443,9 @@ class Orchestrator:
                     tv, ts = info.trade_tick_value, info.trade_tick_size
                     profit_at_tp = abs(tp - fill) / ts * tv * lots
                     loss_at_sl = abs(fill - sl) / ts * tv * lots
-            telegram.post_signal(our_symbol, getattr(strat, "label", strat.key),
-                                 intent["side"], fill, sl, tp,
-                                 confidence=conf, label=conviction.label(conf),
-                                 reason=intent.get("reason", ""),
-                                 lots=lots,
-                                 timeframe=getattr(strat, "timeframe", None),
-                                 balance=balance,
-                                 profit_at_tp=profit_at_tp, loss_at_sl=loss_at_sl)
+            self._post_signal(strat, our_symbol, intent["side"], fill, sl, tp,
+                              lots, balance, profit_at_tp, loss_at_sl,
+                              taken=True, reason=intent.get("reason", ""))
             # Persistent trade journal (exact strategy per trade).
             tradelog.log_open(os.getenv("MT5_BOOK", "?"), strat.key, our_symbol,
                               intent["side"], lots, res["price"], sl, tp,
@@ -473,6 +493,43 @@ class Orchestrator:
                                 balance=snap.get("balance"))
             tradelog.log_close(os.getenv("MT5_BOOK", "?"), strat.key,
                                our_symbol, profit, reason=intent.get("reason", ""))
+
+    def _post_signal(self, strat, our_symbol, side, entry, sl, tp, lots,
+                     balance, profit_at_tp, loss_at_sl, taken, reason=""):
+        """Send one signal card to Telegram, taken or watch-listed, with the
+        out-of-sample track record behind it. Shared by the fill path and the
+        skipped-signal path so every alert looks identical."""
+        st = conviction.signal_stats(strat.key, our_symbol, strat.timeframe)
+        # In the $2k sim, frame the money math against the virtual balance.
+        bal = VIRTUAL_EQUITY if VIRTUAL_EQUITY > 0 else balance
+        telegram.post_signal(
+            our_symbol, getattr(strat, "label", strat.key), side, entry, sl, tp,
+            confidence=st["conf"], label=st["label"], reason=reason, lots=lots,
+            timeframe=getattr(strat, "timeframe", None), balance=bal,
+            profit_at_tp=profit_at_tp, loss_at_sl=loss_at_sl,
+            win_rate=st["win_rate"], edge_r=st["edge_r"], n=st["n"],
+            taken=taken, skip_reason=None if taken else self._skip_reason)
+
+    def _maybe_notify_signal(self, strat, our_symbol, closed_time):
+        """Notify a NEW signal exactly once per candle. Taken trades already
+        posted from the fill path; here we surface the WATCH-LIST ones a risk
+        cap skipped — real, priced setups a larger account could still take."""
+        nkey = (strat.key, our_symbol, closed_time)
+        if nkey in self._notified:
+            return
+        self._notified.add(nkey)
+        if len(self._notified) > 8000:      # bound the memory
+            self._notified.clear()
+            self._notified.add(nkey)
+        taken = self._has_position(strat.key, our_symbol) is not None
+        if taken:
+            return                          # the fill path already posted it
+        p = self._sig_plan
+        if not p or not self._skip_reason:  # not a real priced signal — skip
+            return
+        self._post_signal(strat, our_symbol, p["side"], p["entry"], p["sl"],
+                          p["tp"], p["lots"], None, p["profit_at_tp"],
+                          p["loss_at_sl"], taken=False, reason=p.get("reason", ""))
 
     def _scan_set(self, strat_key, our_symbol, status, detail="", extra=None):
         """Record what one strategy saw on one symbol this poll (for the UI)."""
@@ -677,6 +734,9 @@ class Orchestrator:
                         # trading off, requote) should retry on the next poll,
                         # not be silently skipped until a new candle.
                         acted = self._execute_open(strat, our_symbol, it, equity)
+                        # Notify Telegram of this signal (taken already posted
+                        # from the fill path; this surfaces watch-list skips).
+                        self._maybe_notify_signal(strat, our_symbol, closed_time)
                         if acted:
                             self._last_bar[bar_key] = closed_time
                     elif it["type"] == "close":
