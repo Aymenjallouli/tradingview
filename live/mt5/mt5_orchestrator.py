@@ -557,7 +557,7 @@ class Orchestrator:
         # bridge.symbols maps our name -> broker name; we need the reverse.
         ours = {v: k for k, v in self.bridge.symbols.items()}
         for p in (mt5.positions_get() or []):
-            if p.magic != MAGIC or not p.sl or not p.price_open:
+            if p.magic != orders.MAGIC or not p.sl or not p.price_open:
                 continue
             key = (p.comment or "").strip().split()[0] if p.comment else ""
             our_symbol = ours.get(p.symbol, p.symbol)
