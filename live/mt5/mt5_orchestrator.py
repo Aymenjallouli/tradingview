@@ -128,7 +128,12 @@ class RiskGovernor:
         eq = snap["equity"]
         self._roll_day(eq)
         if self.day_start_equity and not self.blocked:
-            dd = (self.day_start_equity - eq) / self.day_start_equity
+            # Measure the day's LOSS as a fraction of the account we're
+            # simulating: trades are sized for $2k, so a $100 down-day is 5% of
+            # a $2k account even though it's <2% of the real demo balance. The
+            # breaker must fire at the $2k threshold, not the real one.
+            dd_base = VIRTUAL_EQUITY if VIRTUAL_EQUITY > 0 else self.day_start_equity
+            dd = (self.day_start_equity - eq) / dd_base
             if dd >= DAILY_DRAWDOWN_STOP:
                 self.blocked = True
                 _log(f"!!! CIRCUIT BREAKER: equity -{dd*100:.1f}% today. "
@@ -330,8 +335,14 @@ class Orchestrator:
             if info and info.trade_tick_value and info.trade_tick_size:
                 real_risk = (abs(price - sl) / info.trade_tick_size
                              * info.trade_tick_value * lots)
-                real_equity = ((self.bridge.account_snapshot() or {})
-                               .get("balance") or equity)
+                # For a faithful small-account SIMULATION, judge the min-lot and
+                # portfolio caps against the VIRTUAL balance too. Otherwise the
+                # real (larger) demo balance would admit markets a real $2k
+                # account could never size safely — defeating the whole point of
+                # simulating $2k. VIRTUAL_EQUITY=0 -> use the real balance.
+                real_equity = VIRTUAL_EQUITY if VIRTUAL_EQUITY > 0 else (
+                    (self.bridge.account_snapshot() or {})
+                    .get("balance") or equity)
                 real_pct = real_risk / real_equity * 100 if real_equity else 99
                 # Oversize guard: reject an instrument whose MINIMUM lot risks
                 # more than OVERSIZE_CAP_PCT of the account (it simply can't be

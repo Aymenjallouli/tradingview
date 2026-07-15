@@ -59,6 +59,12 @@ def _book_env(b):
     """
     return _env(MT5_BOOK=b["book"], MT5_MAGIC=b["magic"],
                 MT5_DASH_PORT=b["port"],
+                # Simulate a fresh $2,000 account on the existing demo. Every
+                # book sizes and risk-checks against $2k, so together they trade
+                # exactly as one $2k account would -- including skipping markets
+                # whose min-lot is too big for $2k. The extra demo cash is
+                # ignored. Set to 0 to trade the real balance instead.
+                MT5_VIRTUAL_EQUITY="2000",
                 MT5_RISK_MIN="0.5", MT5_RISK_MAX="1.5",
                 MT5_KELLY_CAP="2.0",          # hard ceiling, whatever the score
                 MT5_OVERSIZE_CAP="2.0",       # min-lot must fit under 2%

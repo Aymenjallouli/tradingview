@@ -60,3 +60,4 @@ Thumbs.db
 
 # runtime trade journal (per-machine)
 live/mt5/trades_log.csv
+live/mt5/fresh_start.json

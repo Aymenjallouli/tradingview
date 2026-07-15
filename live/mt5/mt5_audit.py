@@ -40,6 +40,20 @@ BACKTEST_WIN = 0.68         # average OOS win rate
 # trades to judge AND it's losing money.
 MIN_TRADES_TO_JUDGE = int(os.getenv("MT5_AUDIT_MIN_TRADES", "15"))
 
+# A "fresh start" marker (written when we reset to a simulated $2k account) lets
+# the audit score from that moment on a $2k base, ignoring the real demo balance
+# and all trades before the reset.
+FRESH_PATH = os.path.join(os.path.dirname(__file__), "fresh_start.json")
+
+
+def _load_fresh():
+    try:
+        import json
+        with open(FRESH_PATH) as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return None
+
 
 def _stats(pnls):
     """Core stats from a list of trade P&Ls."""
@@ -127,11 +141,27 @@ def audit(days=30, show_strategies=False):
     open_pos = [p for p in (mt5.positions_get() or []) if p.magic in BOOK]
     floating = sum(p.profit for p in open_pos)
 
+    # If we've reset to a simulated $2k account, score only from that moment
+    # and against the $2k base — the real demo balance is irrelevant to the sim.
+    fresh = _load_fresh()
+    since = None
+    if fresh:
+        since = datetime.fromtimestamp(fresh["ts"], timezone.utc)
+        trades = [t for t in trades if t["time"] >= since]
+
     print("=" * 68)
     print(f" AUDIT — ARE WE MAKING MONEY?   (last {days} days)")
     print("=" * 68)
-    print(f" balance ${acc.balance:,.2f}   equity ${acc.equity:,.2f}   "
-          f"floating ${floating:+,.2f} on {len(open_pos)} open")
+    if fresh:
+        vstart = fresh["virtual_start"]
+        vbal = vstart + sum(t["profit"] for t in trades)
+        print(f" SIMULATED ${vstart:,.0f} ACCOUNT  (fresh start {since:%Y-%m-%d %H:%M} UTC)")
+        print(f" virtual balance ${vbal:,.2f}   +floating ${floating:+,.2f} "
+              f"= equity ${vbal + floating:,.2f}   on {len(open_pos)} open")
+        print(f" (real demo balance ${acc.balance:,.2f} is ignored by the sim)")
+    else:
+        print(f" balance ${acc.balance:,.2f}   equity ${acc.equity:,.2f}   "
+              f"floating ${floating:+,.2f} on {len(open_pos)} open")
     print()
 
     if not trades:
