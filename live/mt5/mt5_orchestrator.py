@@ -309,10 +309,16 @@ class Orchestrator:
         # sized to the market rather than to a round number.
         stop_pct = mt5_stops.stop_for(strat.key, our_symbol, strat.timeframe,
                                       intent["stop_pct"])
-        # Keep the reward side proportional so R:R doesn't collapse as the stop
-        # widens. The target is a safety ceiling anyway — 87% of these exit on
-        # a signal long before it — but it must stay reachable.
-        target_pct = max(intent["target_pct"], stop_pct * 1.5)
+        # The target is the strategy's OWN validated one — never chain it to the
+        # stop. stop_for() above widens the stop to the market's measured MAE
+        # (3-10%); tying the target to 1.5x that inflated every mean-reversion
+        # target 1.5-5x (WHEAT ZScoreMR: a validated 3% target became 15% — a
+        # move a 4h bar does not make). Live proof over 60 trades: targets hit
+        # ZERO times, so every winner limped out on a signal exit at +$3.90
+        # while losers ran the full widened stop to -$49. These strategies were
+        # validated at R:R ~0.8 on a 68% win rate; forcing R:R >= 1.5 breaks the
+        # asymmetry that makes them work.
+        target_pct = intent["target_pct"]
         # SL/TP prices from those percentages (direction-aware).
         if intent["side"] == "buy":
             sl = price * (1 - stop_pct)
@@ -589,8 +595,22 @@ class Orchestrator:
             digits = (mt5.symbol_info(p.symbol) or type("x", (), {"digits": 5})).digits
             sl = (p.price_open * (1 - new) if is_buy
                   else p.price_open * (1 + new))
-            tp = (p.price_open * (1 + new * 1.5) if is_buy
-                  else p.price_open * (1 - new * 1.5))
+            # The target is the strategy's OWN validated one — same rule as
+            # _execute_open. Deriving it from the widened stop (1.5x) is what put
+            # every mean-reversion target out of reach; re-deriving it here would
+            # silently undo that fix on every stop widening. Heal it instead, so
+            # a position opened under the old rule gets a reachable target back.
+            strat = next((s for s in self.strategies if s.key == key), None)
+            tgt = getattr(strat, "target_pct", None)
+            tp = p.tp
+            if tgt:
+                cand = (p.price_open * (1 + tgt) if is_buy
+                        else p.price_open * (1 - tgt))
+                # Never set a target the market has already passed: MT5 rejects
+                # it, and that would fail the stop widening riding in the same
+                # request. Leave the old target rather than lose the stop fix.
+                if (cand > p.price_current if is_buy else cand < p.price_current):
+                    tp = cand
             r = mt5.order_send({"action": mt5.TRADE_ACTION_SLTP,
                                 "position": p.ticket, "symbol": p.symbol,
                                 "sl": round(sl, digits), "tp": round(tp, digits)})
