@@ -77,8 +77,13 @@ class MT5Runner:
         self.connected = True
         self.orch = Orchestrator(self.bridge, dry_run=self.dry_run)
         # Cross-sectional momentum runs alongside (rank+rotate on its schedule).
+        # No-op unless MT5_MOMENTUM=1, and then only in ONE book — it bypasses
+        # the orchestrator's rails and its dedup is magic-filtered, so six books
+        # running it buy the same top-2 names six times over.
+        # Pass VIRTUAL_EQUITY straight through: `or 1000` turned the documented
+        # "0 = use the real balance" into a phantom $1,000 account.
         self.momentum = CrossMomentum(self.bridge,
-                                      virtual_equity=VIRTUAL_EQUITY or 1000,
+                                      virtual_equity=VIRTUAL_EQUITY,
                                       dry_run=self.dry_run)
         # Pyramiding: add to WINNERS (silver by default). Safe — capped, never
         # adds to losers. No-op unless MT5_PYRAMID=1.

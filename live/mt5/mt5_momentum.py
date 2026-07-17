@@ -48,18 +48,58 @@ STRATEGY_KEY = "xmom"                  # tags positions
 # Protective stop as a floor under each holding (momentum's crash insurance).
 STOP_PCT = float(os.getenv("MOMO_STOP_PCT", "0.15"))   # -15%
 
+# OFF unless explicitly enabled, and then it must run in EXACTLY ONE book.
+#
+# This module opens positions by calling orders.market_order() directly, so it
+# bypasses every rail the orchestrator applies: the correlation cap, the 20%
+# portfolio cap, the oversize guard and the RiskGovernor. On top of that its
+# dedup (_our_positions) reads orders.open_positions(), which filters by MAGIC —
+# so each book process sees only its OWN xmom holdings and believes it holds
+# nothing. Run under run_all.py, all six books independently bought the same
+# top-2 names: ~6x the intended bet, concentrated in two symbols, invisible to
+# the portfolio cap. Gated the same way as Pyramider (MT5_PYRAMID) so the
+# default is safe; set MT5_MOMENTUM=1 in ONE book's env to arm it.
+ENABLED = os.getenv("MT5_MOMENTUM", "0") == "1"
+
+# The sleeve this module may deploy, in account currency. 0 = the whole real
+# account — a footgun worth spelling out, because momentum sizes by NOTIONAL,
+# not by risk: deploying the full balance across TOP_N names behind a 15% stop
+# puts ~15% of the account at risk (~7.5% per name) against the 2% Kelly cap the
+# signal books run at, and fights those books for margin. If you arm this
+# alongside them, give it its own sleeve: MOMO_CAPITAL=500.
+CAPITAL = float(os.getenv("MOMO_CAPITAL", "0"))
+
 
 class CrossMomentum:
     key = STRATEGY_KEY
     label = "Cross-Sectional Momentum (top-2, monthly)"
 
-    def __init__(self, bridge, virtual_equity=1000.0, dry_run=False):
+    def __init__(self, bridge, virtual_equity=0.0, dry_run=False):
         self.bridge = bridge
         self.virtual_equity = virtual_equity
         self.dry_run = dry_run
         self.last_rebalance = None
         self.current_holdings = []       # our-symbol names currently held
         self.log = []
+
+    def _equity(self):
+        """The capital this book may deploy.
+
+        virtual_equity > 0 means we are simulating a fixed-size account; 0 (the
+        default) means size off the REAL account. It must NEVER fall back to a
+        constant: the caller used to pass `VIRTUAL_EQUITY or 1000`, and since
+        MT5_VIRTUAL_EQUITY=0 means "use the real balance", 0 is falsy and every
+        book sized a $6.5k account as though it were $1,000. The min-lot clamp
+        in rebalance() rounds UP, so that phantom budget still bought real
+        lots — the same failure that made one COFFEE trade 16.8% of the account.
+        No equity reading means no trade, never a guessed number.
+        """
+        if CAPITAL > 0:                     # an explicit sleeve wins
+            return CAPITAL
+        if self.virtual_equity and self.virtual_equity > 0:
+            return float(self.virtual_equity)
+        snap = self.bridge.account_snapshot() or {}
+        return float(snap.get("equity") or snap.get("balance") or 0.0)
 
     def _record(self, m):
         _log(m)
@@ -114,7 +154,10 @@ class CrossMomentum:
                 self._record(f"CLOSED {our} (rotated out)")
 
         # 2. Open new top-N names we don't hold.
-        equity = self.virtual_equity
+        equity = self._equity()
+        if equity <= 0:
+            self._record("no equity reading — not opening (never guess a size)")
+            return
         per_name = equity / max(TOP_N, 1)
         for our in target - held_syms:
             brk = self.bridge.symbols.get(our)
@@ -124,10 +167,10 @@ class CrossMomentum:
             price = tick["ask"]
             sl = price * (1 - STOP_PCT)
             tp = price * (1 + 0.60)          # generous — let winners run
-            # size so this name is ~per_name of notional, capped by risk floor
-            lots = orders.lots_for_risk(brk, equity, 100 * (per_name / equity)
-                                        * STOP_PCT * 100 / 100, price, sl)
-            # simpler: size to deploy ~per_name of equity (spot notional)
+            # Size to deploy ~per_name of equity as spot notional. (A
+            # lots_for_risk() call used to sit here, but its result was
+            # immediately overwritten by the notional sizing below — dead code
+            # that made this read as if it were risk-sized. It is not.)
             info = mt5.symbol_info(brk) if mt5 else None
             if info and info.trade_contract_size:
                 raw = per_name / (price * info.trade_contract_size)
@@ -158,6 +201,8 @@ class CrossMomentum:
 
     def maybe_rebalance(self):
         """Rebalance if REBALANCE_DAYS have passed (or first run)."""
+        if not ENABLED:
+            return
         now = datetime.now(timezone.utc)
         if self.last_rebalance is None:
             self.rebalance()
